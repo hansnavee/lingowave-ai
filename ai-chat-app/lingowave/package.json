@@ -24,7 +24,9 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.2.2",
+    "tsx": "^4.23.8",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -32,8 +34,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build:android:preview": "eas build -p android --profile preview",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "mvp-smoke": "node ./node_modules/esbuild/bin/esbuild scripts/mvp-smoke.ts --bundle --platform=node --format=esm --alias:react-native=./scripts/shims/react-native.mjs --alias:expo-secure-store=./scripts/shims/expo-secure-store.mjs --outfile=scripts/.mvp-smoke.bundle.mjs && node scripts/.mvp-smoke.bundle.mjs"
   },
   "private": true
 }
