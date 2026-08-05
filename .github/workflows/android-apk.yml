@@ -1,0 +1,78 @@
+name: Android APK (EAS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - preview
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "ai-chat-app/lingowave/**"
+      - ".github/workflows/android-apk.yml"
+
+concurrency:
+  group: android-apk-${{ github.ref }}-${{ inputs.profile || 'preview' }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-chat-app/lingowave
+    steps:
+      - name: Check EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "::error::Add repository secret EXPO_TOKEN from https://expo.dev/settings/access-tokens"
+            exit 1
+          fi
+        working-directory: .
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ai-chat-app/lingowave/package-lock.json
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build APK on EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          PROFILE="${{ inputs.profile || 'preview' }}"
+          echo "Building Android APK with profile: $PROFILE"
+          eas build \
+            --platform android \
+            --profile "$PROFILE" \
+            --non-interactive \
+            --no-wait
+
+      - name: Next steps
+        run: |
+          echo "EAS accepted the build. Track it at:"
+          echo "https://expo.dev/accounts/hansnavi/projects/lingowave/builds"
+          echo "When finished, download the APK from the build page."

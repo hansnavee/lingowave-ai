@@ -18,7 +18,7 @@ import {
 import { getChatById } from "../src/repositories/chatRepository";
 import {
   getMessages,
-  saveMessages,
+  sendMessage,
 } from "../src/repositories/messageRepository";
 import { translateMessageForUser } from "../src/services/translationService";
 import {
@@ -30,7 +30,7 @@ import {
 import { purchaseViaStore } from "../src/services/billingBridge";
 import { useSubscriptionStore } from "../src/store/subscriptionStore";
 import { mockChatApi, mockTranslationApi } from "../src/api/mockApi";
-import type { Message, SubscriptionPlan } from "../src/types/models";
+import type { SubscriptionPlan } from "../src/types/models";
 
 type CheckResult = { name: string; ok: boolean; detail?: string };
 
@@ -88,19 +88,22 @@ function chatTranslateGating(isEntitled: boolean, currentlyOn: boolean): {
 }
 
 const UNIQUE = Date.now();
-const EMAIL = `smoke_${UNIQUE}@lingowave.test`;
+const EMAIL = `lingowave.smoke.${UNIQUE}@gmail.com`;
+const EMAIL_B = `lingowave.smoke.b.${UNIQUE}@gmail.com`;
 const PHONE = `+1555${String(UNIQUE).slice(-7)}`;
 const INVITE_PHONE = `+1555${String(UNIQUE + 1).slice(-7)}`;
-const PASSWORD = "smoke123";
+const PASSWORD = "smoke12345";
 
 async function main() {
-  console.log("LingoWave MVP smoke test\n");
+  console.log("LingoWave MVP smoke test (Supabase)\n");
+
+  let authReady = false;
 
   await check("1. Auth signup (phone) + session persistence", async () => {
     const signup = await signupRequest("Smoke Tester", EMAIL, PASSWORD, PHONE);
     assert(signup.ok, signup.ok ? "" : signup.error);
     assert(signup.session.user.phone.includes("1555"), "phone not saved");
-    assert(signup.session.token.startsWith("mock_"), "token missing");
+    assert(Boolean(signup.session.token), "token missing");
 
     const loaded = await loadSession();
     assert(loaded?.user.email === EMAIL, "session not in memory fallback");
@@ -114,8 +117,75 @@ async function main() {
     assert(login.ok, login.ok ? "" : login.error);
     const restored = await restoreSession();
     assert(restored?.user.email === EMAIL, "restoreSession failed after login");
+    authReady = true;
     return `user=${restored!.user.id}`;
   });
+
+  if (!authReady) {
+    console.log(
+      "\nSkipping live Supabase data checks (auth unavailable — often email rate limit or confirm-email setting).\nRunning local entitlement/gating checks with a synthetic user…\n"
+    );
+    const syntheticUserId = `smoke_local_${UNIQUE}`;
+
+    await check("5. AI translate: paywall path / with entitlement", async () => {
+      await clearUserSubscription(syntheticUserId);
+      await useSubscriptionStore.getState().hydrate(syntheticUserId);
+      const without = chatTranslateGating(
+        useSubscriptionStore.getState().isEntitled(),
+        false
+      );
+      assert(without.paywall === true, "expected paywall when not entitled");
+      const translated = await translateMessageForUser({
+        message: {
+          id: "local",
+          type: "text",
+          content: "Hello",
+          originalText: "Hello",
+          time: "Now",
+          isMe: true,
+        },
+        targetLanguage: "hi",
+      });
+      assert(translated.translations?.hi, "expected hi translation");
+      return `local paywallOK translated=${translated.translations!.hi}`;
+    });
+
+    await check("6. Subscription: monthly/quarterly/yearly + persist", async () => {
+      const plans: SubscriptionPlan[] = ["monthly", "quarterly", "yearly"];
+      for (const plan of plans) {
+        await clearUserSubscription(syntheticUserId);
+        await purchaseSubscription(syntheticUserId, plan);
+        const sub = await getSubscription(syntheticUserId);
+        assert(sub.plan === plan, `expected plan ${plan}, got ${sub.plan}`);
+        assert(hasActiveEntitlement(sub), `${plan} not active`);
+      }
+      return "monthly+quarterly+yearly ok (local)";
+    });
+
+    await check("7. Calls: AI translate gated by entitlement", async () => {
+      await clearUserSubscription(syntheticUserId);
+      await useSubscriptionStore.getState().hydrate(syntheticUserId);
+      const denied = callAiTranslateGating(false, false);
+      assert(denied.paywall && !denied.aiOn, "call AI should paywall when free");
+      const allowed = callAiTranslateGating(true, false);
+      assert(allowed.aiOn && !allowed.paywall, "call AI should enable when entitled");
+      return "gating logic verified (local)";
+    });
+
+    console.log("\n—— Summary ——");
+    const failed = results.filter((r) => !r.ok);
+    for (const r of results) {
+      console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.detail ? ` (${r.detail})` : ""}`);
+    }
+    console.log(
+      `\n${results.length - failed.length}/${results.length} passed` +
+        (failed.length ? `, ${failed.length} failed` : "")
+    );
+    if (failed.length) {
+      process.exitCode = 1;
+    }
+    return;
+  }
 
   await check("2. Preferred language onboarding", async () => {
     const result = await updateUserProfile({ preferredLanguage: "hi" });
@@ -127,10 +197,26 @@ async function main() {
   });
 
   let sharedChatId = "";
+  let acceptorId = "";
 
   await check("3. Invites: send by phone + accept → shared chat", async () => {
-    const session = await loadSession();
-    assert(session, "need authenticated session");
+    const sessionA = await loadSession();
+    assert(sessionA, "need authenticated session");
+
+    await logoutRequest();
+    const signupB = await signupRequest(
+      "Smoke Acceptor",
+      EMAIL_B,
+      PASSWORD,
+      INVITE_PHONE
+    );
+    assert(signupB.ok, signupB.ok ? "" : signupB.error);
+    acceptorId = signupB.session.user.id;
+
+    await logoutRequest();
+    const loginA = await loginRequest(EMAIL, PASSWORD);
+    assert(loginA.ok, loginA.ok ? "" : loginA.error);
+    const session = loginA.session;
 
     const created = await createInvites({
       fromUserId: session.user.id,
@@ -148,10 +234,14 @@ async function main() {
       "invite missing from outgoing"
     );
 
+    await logoutRequest();
+    const loginB = await loginRequest(EMAIL_B, PASSWORD);
+    assert(loginB.ok, loginB.ok ? "" : loginB.error);
+
     const accepted = await acceptInvite({
       inviteId: created.invites[0].id,
-      acceptorUserId: "user_smoke_acceptor",
-      acceptorName: "Acceptor",
+      acceptorUserId: acceptorId,
+      acceptorName: "Smoke Acceptor",
     });
     assert(accepted.ok, accepted.ok ? "" : accepted.error);
     sharedChatId = accepted.chat.id;
@@ -160,8 +250,9 @@ async function main() {
     return `chatId=${sharedChatId}`;
   });
 
-  await check("4. Chat: send text + mock media URI", async () => {
-    const chatId = sharedChatId || "1";
+  await check("4. Chat: send text + media URI", async () => {
+    const chatId = sharedChatId;
+    assert(chatId, "need shared chat from invite step");
     const token = (await loadSession())!.token;
 
     const textMsg = {
@@ -170,26 +261,22 @@ async function main() {
       originalText: "Hello from smoke test",
       sourceLanguage: "en" as const,
       isMe: true,
-      senderId: "me",
-      time: "Now",
-      id: "temp",
+      senderId: acceptorId,
     };
 
     const sent = await mockChatApi.sendMessage(token, chatId, textMsg);
-    assert(sent.ok, sent.ok ? "" : "send failed");
+    assert(sent.ok, sent.ok ? "" : sent.ok === false ? sent.error : "send failed");
     assert(sent.data.content === "Hello from smoke test", "text content wrong");
 
-    const existing = await getMessages(chatId);
-    const media: Message = {
-      id: `media_${Date.now()}`,
+    const mediaSent = await sendMessage(chatId, {
       type: "image",
       content: "file://mock/smoke-test-image.jpg",
       fileName: "smoke-test-image.jpg",
-      time: "Now",
       isMe: true,
-      senderId: "me",
-    };
-    await saveMessages(chatId, [...existing, media]);
+      senderId: acceptorId,
+    });
+    assert(mediaSent, "media send failed");
+
     const after = await getMessages(chatId);
     assert(
       after.some((m) => m.content === "file://mock/smoke-test-image.jpg"),
@@ -236,9 +323,18 @@ async function main() {
     const withEnt = chatTranslateGating(true, false);
     assert(withEnt.translateEnabled === true && !withEnt.paywall, "should enable");
 
-    const chatId = sharedChatId || "1";
-    const msgs = await getMessages(chatId);
-    const sample = msgs.find((m) => m.type === "text") ?? msgs[0];
+    const chatId = sharedChatId || "";
+    const msgs = chatId ? await getMessages(chatId) : [];
+    const sample =
+      msgs.find((m) => m.type === "text") ??
+      msgs[0] ?? {
+        id: "local",
+        type: "text" as const,
+        content: "Hello",
+        originalText: "Hello",
+        time: "Now",
+        isMe: true,
+      };
     const translated = await translateMessageForUser({
       message: sample,
       targetLanguage: "hi",

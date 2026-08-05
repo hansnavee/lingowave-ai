@@ -15,9 +15,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lingowave.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "LingoWave needs camera access so you can send photos in chats.",
+        "NSCameraUsageDescription": "LingoWave needs camera access for video calls and to send photos in chats.",
         "NSPhotoLibraryUsageDescription": "LingoWave needs photo library access so you can share images in chats.",
-        "NSMicrophoneUsageDescription": "LingoWave needs microphone access to record voice messages."
+        "NSMicrophoneUsageDescription": "LingoWave needs microphone access for voice calls and voice messages."
       }
     },
     "android": {
@@ -30,10 +30,14 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -41,18 +45,29 @@
     },
     "plugins": [
       "expo-secure-store",
+      "expo-dev-client",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
       [
         "expo-image-picker",
         {
           "photosPermission": "LingoWave needs photo library access so you can share images in chats.",
-          "cameraPermission": "LingoWave needs camera access so you can send photos in chats.",
-          "microphonePermission": "LingoWave needs microphone access to record voice messages."
+          "cameraPermission": "LingoWave needs camera access for video calls and to send photos in chats.",
+          "microphonePermission": "LingoWave needs microphone access for voice calls and voice messages."
         }
       ],
       [
         "expo-av",
         {
-          "microphonePermission": "LingoWave needs microphone access to record voice messages."
+          "microphonePermission": "LingoWave needs microphone access for voice calls and voice messages."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LingoWave needs camera access for video calls.",
+          "microphonePermission": "LingoWave needs microphone access for video calls.",
+          "recordAudioAndroid": true
         }
       ]
     ],

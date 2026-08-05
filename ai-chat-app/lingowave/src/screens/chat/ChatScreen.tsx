@@ -49,13 +49,16 @@ import {
 } from "../../navigation/types";
 import type { Message } from "../../types/models";
 import {
+  deleteMessage,
   getMessages,
-  saveMessages,
+  sendMessage,
+  updateMessage,
 } from "../../repositories/messageRepository";
 import {
   getChatById,
   setChatTranslateEnabled,
 } from "../../repositories/chatRepository";
+import { getOtherChatMemberId } from "../../repositories/callRepository";
 import {
   getDisplayText,
   translateMessageForUser,
@@ -158,14 +161,6 @@ export default function ChatScreen() {
     };
   }, [userId, user?.preferredLanguage, entitled]);
 
-  useEffect(() => {
-    if (messages.length === 0) {
-      return;
-    }
-
-    saveMessages(userId, messages);
-  }, [messages, userId]);
-
   const scrollToEnd = () => {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
@@ -204,6 +199,7 @@ export default function ChatScreen() {
     const withOriginal: Message = {
       ...message,
       originalText: message.originalText ?? message.content,
+      senderId: user?.id,
     };
 
     let next = withOriginal;
@@ -214,6 +210,9 @@ export default function ChatScreen() {
         targetLanguage: user.preferredLanguage,
       });
     }
+
+    const saved = await sendMessage(userId, next);
+    next = saved ?? next;
 
     setMessages((prev) => [...prev, next]);
     scrollToEnd();
@@ -315,9 +314,20 @@ export default function ChatScreen() {
     setAttachmentVisible(false);
   };
 
-  const openCall = (mode: "AudioCall" | "CallVideo") => {
+  const openCall = async (mode: "AudioCall" | "CallVideo") => {
+    const peerId = await getOtherChatMemberId(userId);
+    if (!peerId) {
+      Alert.alert(
+        "No contact",
+        "This chat has no other participant to call yet."
+      );
+      return;
+    }
+
     navigation.navigate(mode, {
       name: userName,
+      peerUserId: peerId,
+      callType: mode === "CallVideo" ? "video" : "audio",
       enableTranslate: translateEnabled && entitled,
     });
   };
@@ -596,13 +606,15 @@ export default function ChatScreen() {
         }}
         onStar={() => {
           if (selectedMessage) {
+            const starred = !selectedMessage.starred;
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === selectedMessage.id
-                  ? { ...msg, starred: !msg.starred }
+                  ? { ...msg, starred }
                   : msg
               )
             );
+            void updateMessage(selectedMessage.id, { starred });
           }
           setActionVisible(false);
         }}
@@ -611,18 +623,21 @@ export default function ChatScreen() {
             setMessages((prev) =>
               prev.filter((msg) => msg.id !== selectedMessage.id)
             );
+            void deleteMessage(selectedMessage.id);
           }
           setActionVisible(false);
         }}
         onPin={() => {
           if (selectedMessage) {
+            const pinned = !selectedMessage.pinned;
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === selectedMessage.id
-                  ? { ...msg, pinned: !msg.pinned }
+                  ? { ...msg, pinned }
                   : msg
               )
             );
+            void updateMessage(selectedMessage.id, { pinned });
           }
           setActionVisible(false);
         }}

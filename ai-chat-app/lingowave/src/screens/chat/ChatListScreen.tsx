@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
 import {
   FlatList,
@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import AppScreen from "../../components/ui/AppScreen";
@@ -40,9 +40,11 @@ export default function ChatListScreen() {
   const [search, setSearch] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
 
-  useEffect(() => {
-    getChats().then(setChats);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      getChats().then(setChats);
+    }, [])
+  );
 
   const filteredChats = useMemo(() => {
     return chats.filter((chat) => {

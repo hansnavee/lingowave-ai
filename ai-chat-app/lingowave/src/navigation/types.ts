@@ -23,10 +23,18 @@ export type AppStackParamList = {
   CallVideo: {
     name: string;
     enableTranslate?: boolean;
+    callId?: string;
+    peerUserId?: string;
+    callType?: "audio" | "video";
+    isIncoming?: boolean;
   };
   AudioCall: {
     name: string;
     enableTranslate?: boolean;
+    callId?: string;
+    peerUserId?: string;
+    callType?: "audio" | "video";
+    isIncoming?: boolean;
   };
   Subscription: undefined;
   LanguageSettings: undefined;

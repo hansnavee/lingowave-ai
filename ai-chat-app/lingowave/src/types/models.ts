@@ -96,6 +96,9 @@ export type CallRecord = {
   type: string;
   time: string;
   icon: string;
+  peerUserId?: string;
+  callType?: "audio" | "video";
+  status?: string;
 };
 
 export type AIMessage = {

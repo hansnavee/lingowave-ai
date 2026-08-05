@@ -29,7 +29,7 @@ import {
 } from "../repositories/chatRepository";
 import {
   getMessages,
-  saveMessages,
+  sendMessage,
 } from "../repositories/messageRepository";
 import { translateText } from "../services/translationService";
 import {
@@ -138,13 +138,10 @@ export const mockChatApi: ChatApi = {
     return { ok: true, data: await getMessages(chatId) };
   },
   async sendMessage(_token, chatId, message) {
-    const existing = await getMessages(chatId);
-    const created = {
-      ...message,
-      id: Date.now().toString(),
-      time: "Now",
-    };
-    await saveMessages(chatId, [...existing, created]);
+    const created = await sendMessage(chatId, message);
+    if (!created) {
+      return { ok: false, error: "Could not send message" };
+    }
     return { ok: true, data: created };
   },
   async setTranslateEnabled(_token, chatId, enabled) {

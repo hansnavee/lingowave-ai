@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 import {
+  Alert,
   FlatList,
   StyleSheet,
 } from "react-native";
@@ -17,6 +18,7 @@ import { useTheme, Spacing } from "../../theme";
 import { ChatStackParamList } from "../../navigation/types";
 import type { ChatUser } from "../../types/models";
 import { getUsers } from "../../repositories/userRepository";
+import { getOrCreateDirectChat } from "../../repositories/chatRepository";
 
 type NavigationProp = NativeStackNavigationProp<
   ChatStackParamList,
@@ -66,13 +68,23 @@ export default function NewChatScreen() {
           <UserListItem
             name={item.name}
             status={item.status}
-            onPress={() =>
+            onPress={async () => {
+              const result = await getOrCreateDirectChat({
+                otherUserId: item.id,
+                otherUserName: item.name,
+              });
+
+              if (!result.ok) {
+                Alert.alert("Could not start chat", result.error);
+                return;
+              }
+
               navigation.navigate("Chat", {
-                userId: item.id,
-                userName: item.name,
+                userId: result.chat.id,
+                userName: result.chat.name,
                 status: item.status,
-              })
-            }
+              });
+            }}
           />
         )}
       />

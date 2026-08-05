@@ -1,45 +1,79 @@
-import type { Chat, Invite } from "../types/models";
+import { supabase } from "../lib/supabase";
+import { buildChatListItem, mapInviteRow } from "../lib/chatMappers";
 import { normalizePhone, validatePhone } from "../utils/validation";
-import { addChat } from "./chatRepository";
-
-let invites: Invite[] = [];
-
-function delay(ms = 300): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import type { Chat, Invite } from "../types/models";
 
 export async function listInvites(userId: string): Promise<Invite[]> {
-  await delay(150);
-  return invites
-    .filter(
-      (invite) =>
-        invite.fromUserId === userId ||
-        invite.status === "pending"
-    )
-    .map((invite) => ({ ...invite }));
+  const [outgoing, incoming] = await Promise.all([
+    listOutgoingInvites(userId),
+    listIncomingForCurrentUser(),
+  ]);
+
+  const byId = new Map<string, Invite>();
+  for (const invite of [...outgoing, ...incoming]) {
+    byId.set(invite.id, invite);
+  }
+
+  return [...byId.values()];
 }
 
 export async function listOutgoingInvites(
   userId: string
 ): Promise<Invite[]> {
-  await delay(150);
-  return invites
-    .filter((invite) => invite.fromUserId === userId)
-    .map((invite) => ({ ...invite }));
+  const { data, error } = await supabase
+    .from("invites")
+    .select("*")
+    .eq("from_user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    console.warn("listOutgoingInvites failed:", error?.message);
+    return [];
+  }
+
+  return data.map(mapInviteRow);
 }
 
 export async function listIncomingByPhone(
   phone: string
 ): Promise<Invite[]> {
   const normalized = normalizePhone(phone);
-  await delay(150);
-  return invites
-    .filter(
-      (invite) =>
-        normalizePhone(invite.toPhone) === normalized &&
-        invite.status === "pending"
-    )
-    .map((invite) => ({ ...invite }));
+
+  const { data, error } = await supabase
+    .from("invites")
+    .select("*")
+    .eq("to_phone", normalized)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    console.warn("listIncomingByPhone failed:", error?.message);
+    return [];
+  }
+
+  return data.map(mapInviteRow);
+}
+
+async function listIncomingForCurrentUser(): Promise<Invite[]> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user) {
+    return [];
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("phone")
+    .eq("id", session.user.id)
+    .maybeSingle();
+
+  if (!profile?.phone) {
+    return [];
+  }
+
+  return listIncomingByPhone(profile.phone);
 }
 
 export async function createInvites(params: {
@@ -63,25 +97,29 @@ export async function createInvites(params: {
     }
   }
 
-  await delay();
+  const expiresAt = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
 
-  const now = Date.now();
-  const created: Invite[] = cleaned.map((phone, index) => {
-    const expires = new Date(now + 7 * 24 * 60 * 60 * 1000);
-    return {
-      id: `invite_${now}_${index}`,
-      fromUserId: params.fromUserId,
-      fromUserName: params.fromUserName,
-      toPhone: normalizePhone(phone),
-      message: params.message?.trim() || undefined,
-      status: "pending",
-      createdAt: new Date(now).toISOString(),
-      expiresAt: expires.toISOString(),
-    };
-  });
+  const rows = cleaned.map((phone) => ({
+    from_user_id: params.fromUserId,
+    from_user_name: params.fromUserName,
+    to_phone: normalizePhone(phone),
+    message: params.message?.trim() || null,
+    status: "pending",
+    expires_at: expiresAt,
+  }));
 
-  invites = [...created, ...invites];
-  return { ok: true, invites: created };
+  const { data, error } = await supabase
+    .from("invites")
+    .insert(rows)
+    .select("*");
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Could not create invites." };
+  }
+
+  return { ok: true, invites: data.map(mapInviteRow) };
 }
 
 export async function acceptInvite(params: {
@@ -89,9 +127,13 @@ export async function acceptInvite(params: {
   acceptorUserId: string;
   acceptorName: string;
 }): Promise<{ ok: true; chat: Chat } | { ok: false; error: string }> {
-  const invite = invites.find((item) => item.id === params.inviteId);
+  const { data: invite, error: inviteError } = await supabase
+    .from("invites")
+    .select("*")
+    .eq("id", params.inviteId)
+    .maybeSingle();
 
-  if (!invite) {
+  if (inviteError || !invite) {
     return { ok: false, error: "Invite not found." };
   }
 
@@ -99,50 +141,69 @@ export async function acceptInvite(params: {
     return { ok: false, error: "This invite is no longer pending." };
   }
 
-  if (new Date(invite.expiresAt).getTime() < Date.now()) {
-    invite.status = "expired";
+  if (new Date(invite.expires_at).getTime() < Date.now()) {
+    await supabase
+      .from("invites")
+      .update({ status: "expired" })
+      .eq("id", invite.id);
     return { ok: false, error: "This invite has expired." };
   }
 
-  await delay();
+  const { data: chat, error: chatError } = await supabase
+    .from("chats")
+    .insert({
+      name: invite.from_user_name,
+      is_group: false,
+      last_message: invite.message || "Invite accepted — say hello!",
+      last_message_at: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
 
-  const chatId = `chat_${invite.id}`;
-  const chat: Chat = {
-    id: chatId,
-    name: invite.fromUserName,
-    message: invite.message || "Invite accepted — say hello!",
-    time: "Now",
-    unread: 1,
-    online: true,
-    isGroup: false,
-    phone: invite.toPhone,
-    translateEnabled: false,
+  if (chatError || !chat) {
+    return {
+      ok: false,
+      error: chatError?.message ?? "Could not create chat.",
+    };
+  }
+
+  const { error: memberError } = await supabase.from("chat_members").insert([
+    { chat_id: chat.id, user_id: params.acceptorUserId, unread_count: 1 },
+    { chat_id: chat.id, user_id: invite.from_user_id, unread_count: 0 },
+  ]);
+
+  if (memberError) {
+    return { ok: false, error: memberError.message };
+  }
+
+  const { error: updateError } = await supabase
+    .from("invites")
+    .update({ status: "accepted", chat_id: chat.id })
+    .eq("id", invite.id);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return {
+    ok: true,
+    chat: buildChatListItem({
+      id: chat.id,
+      name: invite.from_user_name,
+      lastMessage: invite.message || "Invite accepted — say hello!",
+      lastMessageAt: chat.last_message_at,
+      unread: 1,
+      isGroup: false,
+      translateEnabled: false,
+      phone: invite.to_phone,
+    }),
   };
-
-  await addChat(chat);
-
-  invite.status = "accepted";
-  invite.chatId = chatId;
-
-  return { ok: true, chat };
 }
 
-/** Demo helper: create a pending invite addressed to the current user's phone. */
-export async function seedIncomingInviteForDemo(params: {
+/** Demo helper — no-op on Supabase (cannot invent foreign keys). */
+export async function seedIncomingInviteForDemo(_params: {
   toPhone: string;
   fromUserName?: string;
-}): Promise<Invite> {
-  const invite: Invite = {
-    id: `invite_demo_${Date.now()}`,
-    fromUserId: "user_demo_sender",
-    fromUserName: params.fromUserName ?? "Alex Traveler",
-    toPhone: normalizePhone(params.toPhone),
-    message: "Let's chat across languages!",
-    status: "pending",
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-  };
-
-  invites = [invite, ...invites];
-  return invite;
+}): Promise<Invite | null> {
+  return null;
 }

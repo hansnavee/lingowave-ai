@@ -26,7 +26,6 @@ import {
   createInvites,
   listIncomingByPhone,
   listOutgoingInvites,
-  seedIncomingInviteForDemo,
 } from "../../repositories/inviteRepository";
 import type { Invite } from "../../types/models";
 import { ChatStackParamList } from "../../navigation/types";
@@ -127,13 +126,10 @@ export default function InvitesScreen() {
   };
 
   const handleSeedDemo = async () => {
-    if (!user) {
-      return;
-    }
-
-    await seedIncomingInviteForDemo({ toPhone: user.phone });
-    Alert.alert("Demo invite added", "Accept it below to open a chat.");
-    refresh();
+    Alert.alert(
+      "Use two accounts",
+      "Send an invite from one account to another account's phone number, then accept it on the second device."
+    );
   };
 
   return (

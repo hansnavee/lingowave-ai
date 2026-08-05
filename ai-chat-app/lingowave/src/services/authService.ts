@@ -1,40 +1,18 @@
-import type { AuthUser, PreferredLanguage } from "../types/models";
+import type { AuthUser } from "../types/models";
 import {
   validateEmailOnly,
   validateLogin,
   validateSignup,
   normalizePhone,
 } from "../utils/validation";
+import { supabase } from "../lib/supabase";
+import { profileToAuthUser } from "../lib/mappers";
+import type { ProfileRow } from "../types/database";
 import {
   clearSession,
-  loadSession,
   saveSession,
   type SessionPayload,
 } from "./sessionStorage";
-
-function delay(ms = 400): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function createToken(): string {
-  return `mock_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
-function toUser(
-  name: string,
-  email: string,
-  phone: string,
-  preferredLanguage?: PreferredLanguage
-): AuthUser {
-  return {
-    id: `user_${email.trim().toLowerCase()}`,
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
-    phone: normalizePhone(phone),
-    preferredLanguage,
-    createdAt: new Date().toISOString(),
-  };
-}
 
 export type AuthResult =
   | { ok: true; session: SessionPayload }
@@ -44,7 +22,115 @@ export type SimpleResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
-/** Mock auth API — swap for real backend in Phase 2. */
+function authErrorMessage(error: { message: string } | null): string {
+  if (!error?.message) {
+    return "Something went wrong. Please try again.";
+  }
+
+  const message = error.message.toLowerCase();
+
+  if (message.includes("invalid login credentials")) {
+    return "Incorrect email or password.";
+  }
+
+  if (message.includes("user already registered")) {
+    return "An account with this email already exists.";
+  }
+
+  if (message.includes("email not confirmed")) {
+    return "Confirm your email before signing in. Check your inbox.";
+  }
+
+  if (message.includes("password")) {
+    return error.message;
+  }
+
+  return error.message;
+}
+
+async function fetchProfile(userId: string): Promise<ProfileRow | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Failed to load profile:", error.message);
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+async function ensureProfile(params: {
+  id: string;
+  email: string;
+  name?: string;
+  phone?: string;
+}): Promise<ProfileRow | null> {
+  try {
+    const existing = await fetchProfile(params.id);
+
+    if (existing) {
+      return existing;
+    }
+  } catch (error) {
+    console.warn(
+      "Profile fetch failed, will try upsert:",
+      error instanceof Error ? error.message : error
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: params.id,
+        email: params.email.trim().toLowerCase(),
+        name: params.name?.trim() || params.email.split("@")[0] || "User",
+        phone: params.phone ? normalizePhone(params.phone) : "",
+      },
+      { onConflict: "id" }
+    )
+    .select("*")
+    .single();
+
+  if (error) {
+    console.warn("Failed to ensure profile:", error.message);
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+async function buildSession(
+  accessToken: string,
+  userId: string,
+  email: string,
+  meta?: { name?: string; phone?: string }
+): Promise<SessionPayload | null> {
+  const profile = await ensureProfile({
+    id: userId,
+    email,
+    name: meta?.name,
+    phone: meta?.phone,
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  const session: SessionPayload = {
+    token: accessToken,
+    user: profileToAuthUser(profile),
+  };
+
+  await saveSession(session);
+  return session;
+}
+
+/** Supabase Auth — free-tier email/password. */
 export async function loginRequest(
   email: string,
   password: string
@@ -55,35 +141,36 @@ export async function loginRequest(
     return { ok: false, error: validationError };
   }
 
-  await delay();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
 
-  const existing = await loadSession();
-  const fallbackPhone =
-    existing?.user.email === email.trim().toLowerCase()
-      ? existing.user.phone
-      : "+10000000000";
+  if (error || !data.session || !data.user) {
+    return { ok: false, error: authErrorMessage(error) };
+  }
 
-  const user = toUser(
-    existing?.user.email === email.trim().toLowerCase()
-      ? existing.user.name
-      : email.split("@")[0] || "User",
-    email,
-    existing?.user.email === email.trim().toLowerCase()
-      ? existing.user.phone
-      : fallbackPhone,
-    existing?.user.email === email.trim().toLowerCase()
-      ? existing.user.preferredLanguage
-      : undefined
-  );
+  try {
+    const session = await buildSession(
+      data.session.access_token,
+      data.user.id,
+      data.user.email ?? email
+    );
 
-  const session: SessionPayload = {
-    token: createToken(),
-    user,
-  };
+    if (!session) {
+      return { ok: false, error: "Signed in, but profile could not be loaded." };
+    }
 
-  await saveSession(session);
-
-  return { ok: true, session };
+    return { ok: true, session };
+  } catch (profileError) {
+    return {
+      ok: false,
+      error:
+        profileError instanceof Error
+          ? profileError.message
+          : "Signed in, but profile could not be loaded.",
+    };
+  }
 }
 
 export async function signupRequest(
@@ -98,45 +185,108 @@ export async function signupRequest(
     return { ok: false, error: validationError };
   }
 
-  await delay();
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = normalizePhone(phone);
 
-  const user = toUser(name, email, phone);
-  const session: SessionPayload = {
-    token: createToken(),
-    user,
-  };
+  const { data, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password,
+    options: {
+      data: {
+        name: name.trim(),
+        phone: normalizedPhone,
+      },
+    },
+  });
 
-  await saveSession(session);
+  if (error) {
+    return { ok: false, error: authErrorMessage(error) };
+  }
 
-  return { ok: true, session };
+  if (!data.session || !data.user) {
+    return {
+      ok: false,
+      error:
+        "Account created. Confirm your email, then sign in. (Disable email confirmation in Supabase Auth settings for instant signup.)",
+    };
+  }
+
+  try {
+    const session = await buildSession(
+      data.session.access_token,
+      data.user.id,
+      data.user.email ?? normalizedEmail,
+      { name: name.trim(), phone: normalizedPhone }
+    );
+
+    if (!session) {
+      return {
+        ok: false,
+        error: "Account created, but profile could not be loaded.",
+      };
+    }
+
+    return { ok: true, session };
+  } catch (profileError) {
+    return {
+      ok: false,
+      error:
+        profileError instanceof Error
+          ? profileError.message
+          : "Account created, but profile could not be loaded.",
+    };
+  }
 }
 
 export async function updateUserProfile(
-  patch: Partial<
-    Pick<AuthUser, "name" | "phone" | "preferredLanguage">
-  >
+  patch: Partial<Pick<AuthUser, "name" | "phone" | "preferredLanguage">>
 ): Promise<AuthResult> {
-  const existing = await loadSession();
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
 
-  if (!existing) {
+  if (!authSession?.user) {
     return { ok: false, error: "Not signed in." };
   }
 
-  const user: AuthUser = {
-    ...existing.user,
-    ...patch,
-    phone: patch.phone
-      ? normalizePhone(patch.phone)
-      : existing.user.phone,
-  };
+  const updates: {
+    name?: string;
+    phone?: string;
+    preferred_language?: string | null;
+  } = {};
+
+  if (patch.name !== undefined) {
+    updates.name = patch.name.trim();
+  }
+
+  if (patch.phone !== undefined) {
+    updates.phone = normalizePhone(patch.phone);
+  }
+
+  if (patch.preferredLanguage !== undefined) {
+    updates.preferred_language = patch.preferredLanguage;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", authSession.user.id)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error?.message ?? "Could not update profile.",
+    };
+  }
 
   const session: SessionPayload = {
-    ...existing,
-    user,
+    token: authSession.access_token,
+    user: profileToAuthUser(data),
   };
 
   await saveSession(session);
-
   return { ok: true, session };
 }
 
@@ -149,7 +299,13 @@ export async function resetPasswordRequest(
     return { ok: false, error: validationError };
   }
 
-  await delay();
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim().toLowerCase()
+  );
+
+  if (error) {
+    return { ok: false, error: authErrorMessage(error) };
+  }
 
   return {
     ok: true,
@@ -158,22 +314,25 @@ export async function resetPasswordRequest(
 }
 
 export async function restoreSession(): Promise<SessionPayload | null> {
-  const session = await loadSession();
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
 
-  if (!session) {
+  if (!authSession?.user) {
+    await clearSession();
     return null;
   }
 
-  // Migrate older sessions missing phone / createdAt.
-  const user = {
-    ...session.user,
-    phone: session.user.phone || "+10000000000",
-    createdAt: session.user.createdAt || new Date().toISOString(),
-  };
+  const session = await buildSession(
+    authSession.access_token,
+    authSession.user.id,
+    authSession.user.email ?? ""
+  );
 
-  return { ...session, user };
+  return session;
 }
 
 export async function logoutRequest(): Promise<void> {
+  await supabase.auth.signOut();
   await clearSession();
 }

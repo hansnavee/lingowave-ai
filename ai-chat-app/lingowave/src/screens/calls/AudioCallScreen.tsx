@@ -1,11 +1,5 @@
-import React, { useState } from "react";
-
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
-
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import {
   RouteProp,
   useRoute,
@@ -16,15 +10,14 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AppScreen from "../../components/ui/AppScreen";
 import AppText from "../../components/ui/AppText";
 import PaywallSheet from "../../components/subscription/PaywallSheet";
+import LiveKitCallRoom from "../../components/calls/LiveKitCallRoom";
 
-import {
-  useTheme,
-  Typography,
-} from "../../theme";
+import { useTheme } from "../../theme";
 import { AppStackParamList } from "../../navigation/types";
 import { useSubscriptionStore } from "../../store/subscriptionStore";
 import { useAuthStore } from "../../store/authStore";
 import { getLanguageLabel } from "../../constants/languages";
+import { startOutgoingCall } from "../../services/callService";
 
 type NavigationProp = NativeStackNavigationProp<
   AppStackParamList,
@@ -37,7 +30,8 @@ export default function AudioCallScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<AudioRoute>();
-  const { name, enableTranslate } = route.params;
+  const { name, enableTranslate, callId, peerUserId, isIncoming } =
+    route.params;
   const isEntitled = useSubscriptionStore((state) => state.isEntitled);
   const preferredLanguage = useAuthStore(
     (state) => state.user?.preferredLanguage
@@ -45,9 +39,45 @@ export default function AudioCallScreen() {
 
   const [aiOn, setAiOn] = useState(Boolean(enableTranslate) && isEntitled());
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [activeCallId, setActiveCallId] = useState<string | null>(
+    callId ?? null
+  );
+  const [starting, setStarting] = useState(!callId && Boolean(peerUserId));
   const [caption, setCaption] = useState(
     "Calling… (original audio, no translation)"
   );
+
+  useEffect(() => {
+    if (callId || !peerUserId || isIncoming) {
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const result = await startOutgoingCall({
+        calleeId: peerUserId,
+        callType: "audio",
+      });
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!result.ok) {
+        Alert.alert("Call failed", result.error);
+        navigation.goBack();
+        return;
+      }
+
+      setActiveCallId(result.call.id);
+      setStarting(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [callId, peerUserId, isIncoming, navigation]);
 
   const toggleAi = () => {
     if (aiOn) {
@@ -62,67 +92,26 @@ export default function AudioCallScreen() {
     }
 
     setAiOn(true);
-    setCaption(
-      `AI captions on · ${getLanguageLabel(preferredLanguage)}`
-    );
+    setCaption(`AI captions on · ${getLanguageLabel(preferredLanguage)}`);
   };
 
   return (
-    <AppScreen
-      style={{
-        backgroundColor: theme.colors.background,
-      }}
-    >
-      <View style={styles.container}>
-        <View
-          style={[
-            styles.avatar,
-            { backgroundColor: theme.colors.card },
-          ]}
-        >
-          <AppText size={60}>👤</AppText>
+    <AppScreen style={{ backgroundColor: theme.colors.background }}>
+      {starting || !activeCallId ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={theme.colors.primary} />
+          <AppText style={styles.loadingText}>Starting call…</AppText>
         </View>
-
-        <AppText size={Typography.h2} weight="700">
-          {name}
-        </AppText>
-
-        <AppText
-          color={theme.colors.textSecondary}
-          style={styles.status}
-        >
-          {caption}
-        </AppText>
-
-        <TouchableOpacity
-          style={[
-            styles.aiButton,
-            {
-              backgroundColor: aiOn
-                ? theme.colors.primary
-                : theme.colors.primaryMuted,
-            },
-          ]}
-          onPress={toggleAi}
-        >
-          <AppText
-            weight="700"
-            color={aiOn ? theme.colors.onPrimary : theme.colors.primary}
-          >
-            {aiOn ? "AI Translate On" : "Enable AI Translate"}
-          </AppText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.endButton,
-            { backgroundColor: theme.colors.callEnd },
-          ]}
-          onPress={() => navigation.goBack()}
-        >
-          <AppText>📞</AppText>
-        </TouchableOpacity>
-      </View>
+      ) : (
+        <LiveKitCallRoom
+          callId={activeCallId}
+          peerName={name}
+          callType="audio"
+          aiOn={aiOn}
+          onToggleAi={toggleAi}
+          caption={caption}
+        />
+      )}
 
       <PaywallSheet
         visible={paywallVisible}
@@ -138,36 +127,13 @@ export default function AudioCallScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 24,
+    gap: 12,
   },
-  avatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  status: {
-    marginTop: 10,
-    textAlign: "center",
-  },
-  aiButton: {
-    marginTop: 28,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 999,
-  },
-  endButton: {
-    marginTop: 48,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: "center",
-    alignItems: "center",
+  loadingText: {
+    marginTop: 8,
   },
 });
