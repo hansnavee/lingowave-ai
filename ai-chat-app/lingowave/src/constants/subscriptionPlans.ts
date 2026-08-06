@@ -18,9 +18,10 @@ export const SUBSCRIPTION_PLANS: PlanConfig[] = [
     durationDays: 30,
     productId: "ai_translate_monthly",
     perks: [
-      "AI message translation",
+      "AI message translation (server-side)",
       "Voice note transcription + translation",
       "Live call captions",
+      "Daily cosmic luck + AI photo refresh",
     ],
   },
   {

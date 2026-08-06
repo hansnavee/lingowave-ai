@@ -48,7 +48,7 @@ export const mockTtsProvider: TextToSpeechProvider = {
   },
 };
 
-export const mockTranslateProvider: TranslateProvider = {
+export const serverTranslateProvider: TranslateProvider = {
   async translate(text, target, source) {
     const result = await translateText({
       text,
@@ -58,6 +58,9 @@ export const mockTranslateProvider: TranslateProvider = {
     return result.translatedText;
   },
 };
+
+/** @deprecated Use serverTranslateProvider — kept for compatibility. */
+export const mockTranslateProvider = serverTranslateProvider;
 
 export const mockIapProvider: InAppPurchaseProvider = {
   async getProducts() {

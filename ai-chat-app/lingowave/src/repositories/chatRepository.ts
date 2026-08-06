@@ -2,6 +2,11 @@ import { supabase } from "../lib/supabase";
 import { buildChatListItem } from "../lib/chatMappers";
 import type { Chat } from "../types/models";
 import type { ChatRow } from "../types/database";
+import { getBlockedIds } from "./blockRepository";
+import {
+  getLastSeenMap,
+  isOnlineFromLastSeen,
+} from "../services/presenceService";
 
 async function requireUserId(): Promise<string | null> {
   const {
@@ -15,6 +20,8 @@ export async function getChats(): Promise<Chat[]> {
   if (!userId) {
     return [];
   }
+
+  const blockedIds = await getBlockedIds();
 
   const { data: memberships, error } = await supabase
     .from("chat_members")
@@ -40,6 +47,30 @@ export async function getChats(): Promise<Chat[]> {
   }
 
   const chatById = new Map(chatRows.map((chat) => [chat.id, chat]));
+  const peerIds: string[] = [];
+  const peerByChat = new Map<string, string>();
+
+  for (const membership of memberships) {
+    const chat = chatById.get(membership.chat_id);
+    if (!chat || chat.is_group) {
+      continue;
+    }
+
+    const { data: otherMembers } = await supabase
+      .from("chat_members")
+      .select("user_id")
+      .eq("chat_id", chat.id)
+      .neq("user_id", userId)
+      .limit(1);
+
+    const otherUserId = otherMembers?.[0]?.user_id;
+    if (otherUserId) {
+      peerByChat.set(chat.id, otherUserId);
+      peerIds.push(otherUserId);
+    }
+  }
+
+  const lastSeenMap = await getLastSeenMap([...new Set(peerIds)]);
   const chats: Chat[] = [];
 
   for (const membership of memberships) {
@@ -48,30 +79,31 @@ export async function getChats(): Promise<Chat[]> {
       continue;
     }
 
+    const peerId = peerByChat.get(chat.id);
+    if (peerId && blockedIds.has(peerId)) {
+      continue;
+    }
+
     let displayName = chat.name;
     let phone: string | undefined;
+    let online = false;
 
-    if (!chat.is_group) {
-      const { data: otherMembers } = await supabase
-        .from("chat_members")
-        .select("user_id")
-        .eq("chat_id", chat.id)
-        .neq("user_id", userId)
-        .limit(1);
+    if (!chat.is_group && peerId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, phone, last_seen_at")
+        .eq("id", peerId)
+        .maybeSingle();
 
-      const otherUserId = otherMembers?.[0]?.user_id;
-      if (otherUserId) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("name, phone")
-          .eq("id", otherUserId)
-          .maybeSingle();
-
-        if (profile?.name) {
-          displayName = profile.name;
-          phone = profile.phone || undefined;
-        }
+      if (profile?.name) {
+        displayName = profile.name;
+        phone = profile.phone || undefined;
       }
+
+      online = isOnlineFromLastSeen(
+        (profile as { last_seen_at?: string | null } | null)?.last_seen_at ??
+          lastSeenMap[peerId]
+      );
     }
 
     chats.push(
@@ -84,6 +116,7 @@ export async function getChats(): Promise<Chat[]> {
         isGroup: chat.is_group,
         translateEnabled: chat.translate_enabled,
         phone,
+        online,
       })
     );
   }
@@ -126,6 +159,14 @@ export async function getOrCreateDirectChat(params: {
 
   if (params.otherUserId === userId) {
     return { ok: false, error: "You cannot chat with yourself." };
+  }
+
+  const blockedIds = await getBlockedIds();
+  if (blockedIds.has(params.otherUserId)) {
+    return {
+      ok: false,
+      error: "You blocked this user. Unblock them in Privacy settings first.",
+    };
   }
 
   const { data: myMemberships, error: mineError } = await supabase

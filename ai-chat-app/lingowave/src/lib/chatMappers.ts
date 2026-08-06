@@ -100,6 +100,7 @@ export function buildChatListItem(params: {
   isGroup: boolean;
   translateEnabled: boolean;
   phone?: string;
+  online?: boolean;
 }): Chat {
   return {
     id: params.id,
@@ -107,7 +108,7 @@ export function buildChatListItem(params: {
     message: params.lastMessage || "No messages yet",
     time: formatChatTime(params.lastMessageAt),
     unread: params.unread,
-    online: false,
+    online: Boolean(params.online),
     isGroup: params.isGroup,
     phone: params.phone,
     translateEnabled: params.translateEnabled,

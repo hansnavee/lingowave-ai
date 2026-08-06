@@ -24,10 +24,24 @@ export interface AuthApi {
     email: string;
     password: string;
     phone: string;
+    countryCode?: string;
+    dateOfBirth?: string;
+    birthPlace?: string;
   }): Promise<ApiResult<{ token: string; user: AuthUser }>>;
   updateProfile(
     token: string,
-    patch: Partial<Pick<AuthUser, "name" | "phone" | "preferredLanguage">>
+    patch: Partial<
+      Pick<
+        AuthUser,
+        | "name"
+        | "phone"
+        | "preferredLanguage"
+        | "avatarUrl"
+        | "countryCode"
+        | "dateOfBirth"
+        | "birthPlace"
+      >
+    >
   ): Promise<ApiResult<AuthUser>>;
 }
 

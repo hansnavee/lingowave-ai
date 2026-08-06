@@ -3,6 +3,7 @@
     "name": "LingoWave",
     "slug": "lingowave",
     "version": "1.0.0",
+    "scheme": "lingowave",
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +18,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "LingoWave needs camera access for video calls and to send photos in chats.",
         "NSPhotoLibraryUsageDescription": "LingoWave needs photo library access so you can share images in chats.",
-        "NSMicrophoneUsageDescription": "LingoWave needs microphone access for voice calls and voice messages."
+        "NSMicrophoneUsageDescription": "LingoWave needs microphone access for voice calls and voice messages.",
+        "NSContactsUsageDescription": "LingoWave uses your contacts to show friends who already joined the app.",
+        "NSLocationWhenInUseUsageDescription": "LingoWave uses your location when you choose to share it in a chat."
       }
     },
     "android": {
@@ -35,9 +38,12 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.READ_CONTACTS",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -48,6 +54,12 @@
       "expo-dev-client",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "LingoWave uses your contacts to show friends who already joined the app."
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -69,7 +81,14 @@
           "microphonePermission": "LingoWave needs microphone access for video calls.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "LingoWave uses your location when you choose to share it in a chat."
+        }
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

@@ -19,7 +19,7 @@ interface AppButtonProps {
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
 }
 
 export default function AppButton({
@@ -36,10 +36,12 @@ export default function AppButton({
       ? theme.colors.primary
       : variant === "secondary"
         ? theme.colors.primaryMuted
-        : "transparent";
+        : variant === "danger"
+          ? theme.colors.danger
+          : "transparent";
 
   const textColor =
-    variant === "primary"
+    variant === "primary" || variant === "danger"
       ? theme.colors.onPrimary
       : theme.colors.primary;
 

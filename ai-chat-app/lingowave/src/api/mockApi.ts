@@ -63,7 +63,10 @@ export const mockAuthApi: AuthApi = {
       input.name,
       input.email,
       input.password,
-      input.phone
+      input.phone,
+      input.countryCode,
+      input.dateOfBirth,
+      input.birthPlace
     );
     if (!result.ok) {
       return { ok: false, error: result.error };

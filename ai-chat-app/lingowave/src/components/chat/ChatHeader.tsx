@@ -1,41 +1,53 @@
 import React from "react";
 
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 
 import AppText from "../ui/AppText";
+import ProfileAvatar from "../profile/ProfileAvatar";
 
-import {
-  useTheme,
-  Spacing,
-  Typography,
-} from "../../theme";
+import { useTheme, Spacing, Typography } from "../../theme";
 
 interface ChatHeaderProps {
   name: string;
   online?: boolean;
+  avatarUrl?: string | null;
   translateEnabled?: boolean;
   onBack: () => void;
   onAudioCall?: () => void;
   onVideoCall?: () => void;
   onToggleTranslate?: () => void;
+  onBlockUser?: () => void;
 }
 
 export default function ChatHeader({
   name,
   online = false,
+  avatarUrl,
   translateEnabled = false,
   onBack,
   onAudioCall,
   onVideoCall,
   onToggleTranslate,
+  onBlockUser,
 }: ChatHeaderProps) {
   const { theme } = useTheme();
+
+  const openMore = () => {
+    if (!onBlockUser) {
+      return;
+    }
+
+    Alert.alert(name, undefined, [
+      {
+        text: "Block user",
+        style: "destructive",
+        onPress: onBlockUser,
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   return (
     <View
@@ -55,15 +67,19 @@ export default function ChatHeader({
         />
       </TouchableOpacity>
 
-      <View
-        style={[
-          styles.avatar,
-          { backgroundColor: theme.colors.avatar },
-        ]}
-      >
-        <AppText color={theme.colors.onPrimary} weight="700">
-          {name.charAt(0).toUpperCase()}
-        </AppText>
+      <View style={styles.avatarWrap}>
+        <ProfileAvatar name={name} avatarUrl={avatarUrl} size={42} />
+        <View
+          style={[
+            styles.dot,
+            {
+              backgroundColor: online
+                ? theme.colors.online
+                : theme.colors.textSecondary,
+              borderColor: theme.colors.background,
+            },
+          ]}
+        />
       </View>
 
       <View style={styles.info}>
@@ -77,9 +93,7 @@ export default function ChatHeader({
 
         <AppText
           size={13}
-          color={
-            online ? theme.colors.online : theme.colors.textSecondary
-          }
+          color={online ? theme.colors.online : theme.colors.textSecondary}
         >
           {online ? "Online" : "Offline"}
           {translateEnabled ? " · AI" : ""}
@@ -113,11 +127,7 @@ export default function ChatHeader({
       ) : null}
 
       <TouchableOpacity onPress={onAudioCall} style={styles.iconButton}>
-        <Ionicons
-          name="call-outline"
-          size={22}
-          color={theme.colors.primary}
-        />
+        <Ionicons name="call-outline" size={22} color={theme.colors.primary} />
       </TouchableOpacity>
 
       <TouchableOpacity onPress={onVideoCall} style={styles.iconButton}>
@@ -127,6 +137,16 @@ export default function ChatHeader({
           color={theme.colors.primary}
         />
       </TouchableOpacity>
+
+      {onBlockUser ? (
+        <TouchableOpacity onPress={openMore} style={styles.iconButton}>
+          <Ionicons
+            name="ellipsis-vertical"
+            size={20}
+            color={theme.colors.textPrimary}
+          />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -139,13 +159,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
   },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: "center",
-    alignItems: "center",
+  avatarWrap: {
     marginLeft: Spacing.sm,
+  },
+  dot: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
   },
   info: {
     flex: 1,

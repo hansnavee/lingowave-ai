@@ -85,8 +85,9 @@ export default function SubscriptionScreen() {
         </AppText>
 
         <AppText color={theme.colors.textSecondary} style={styles.subtitle}>
-          Free chat and calls stay in the original language. Subscribe to
-          translate into your preferred language.
+          Free chat stays in the original language. Subscribe with Stripe to
+          unlock AI translation into your preferred language for messages and
+          captions.
         </AppText>
 
         {isEntitled() ? (
@@ -170,10 +171,10 @@ export default function SubscriptionScreen() {
           <ActivityIndicator color={theme.colors.primary} style={styles.loader} />
         ) : (
           <>
-            <AppButton title="Subscribe" onPress={handlePurchase} />
+            <AppButton title="Subscribe with Stripe" onPress={handlePurchase} />
             <TouchableOpacity onPress={handleRestore} style={styles.restore}>
               <AppText color={theme.colors.textSecondary} weight="600">
-                Restore purchases
+                Restore / sync subscription
               </AppText>
             </TouchableOpacity>
           </>

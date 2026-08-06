@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import AppScreen from "../../components/ui/AppScreen";
 import AppText from "../../components/ui/AppText";
@@ -17,10 +18,13 @@ import AppButton from "../../components/ui/AppButton";
 import { SUPPORTED_LANGUAGES } from "../../constants/languages";
 import type { PreferredLanguage } from "../../types/models";
 import { useAuthStore } from "../../store/authStore";
+import { useSubscriptionStore } from "../../store/subscriptionStore";
 import { useTheme, Spacing, Typography } from "../../theme";
+import type { AppStackParamList } from "../../navigation/types";
 
 export default function LanguageSetupScreen() {
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { theme } = useTheme();
   const setPreferredLanguage = useAuthStore(
     (state) => state.setPreferredLanguage
@@ -30,14 +34,32 @@ export default function LanguageSetupScreen() {
   const needsLanguageSetup = useAuthStore(
     (state) => state.needsLanguageSetup
   );
+  const isEntitled = useSubscriptionStore((state) => state.isEntitled);
+  const aiEnabled = isEntitled();
 
   const [selected, setSelected] = useState<PreferredLanguage | null>(
     user?.preferredLanguage ?? null
   );
 
   const canGoBack = navigation.canGoBack() && !needsLanguageSetup;
+  const canEdit = needsLanguageSetup || aiEnabled;
 
   const handleContinue = async () => {
+    if (!canEdit) {
+      Alert.alert(
+        "Language locked",
+        "Your language matches the country you chose at signup. Subscribe to AI Translate to change it.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Subscribe",
+            onPress: () => navigation.navigate("Subscription"),
+          },
+        ]
+      );
+      return;
+    }
+
     if (!selected) {
       Alert.alert("Choose a language", "Pick the language you want to read.");
       return;
@@ -71,8 +93,9 @@ export default function LanguageSetupScreen() {
         </AppText>
 
         <AppText color={theme.colors.textSecondary} style={styles.subtitle}>
-          We’ll show free chats in the original language. With AI Translate,
-          messages and calls appear in the language you pick here.
+          {canEdit
+            ? "With AI Translate, messages and calls appear in the language you pick here."
+            : "This is set from your signup country and stays locked until AI Translate is enabled."}
         </AppText>
 
         <FlatList
@@ -84,10 +107,12 @@ export default function LanguageSetupScreen() {
 
             return (
               <TouchableOpacity
+                disabled={!canEdit}
                 onPress={() => setSelected(item.code)}
                 style={[
                   styles.row,
                   {
+                    opacity: canEdit ? 1 : 0.7,
                     backgroundColor: active
                       ? theme.colors.primaryMuted
                       : theme.colors.elevated,
@@ -115,8 +140,13 @@ export default function LanguageSetupScreen() {
 
         {isLoading ? (
           <ActivityIndicator color={theme.colors.primary} />
-        ) : (
+        ) : canEdit ? (
           <AppButton title="Continue" onPress={handleContinue} />
+        ) : (
+          <AppButton
+            title="Unlock with AI Translate"
+            onPress={() => navigation.navigate("Subscription")}
+          />
         )}
       </View>
     </AppScreen>

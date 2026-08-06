@@ -13,6 +13,16 @@ type ProfilesTable = {
     email: string;
     phone: string;
     preferred_language: string | null;
+    avatar_url: string | null;
+    avatar_previous_url: string | null;
+    avatar_refresh_at: string | null;
+    avatar_undo_expires_at: string | null;
+    avatar_refresh_day: string | null;
+    avatar_filter_name: string | null;
+    country_code: string | null;
+    last_seen_at: string | null;
+    date_of_birth: string | null;
+    birth_place: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -22,6 +32,16 @@ type ProfilesTable = {
     email: string;
     phone?: string;
     preferred_language?: string | null;
+    avatar_url?: string | null;
+    avatar_previous_url?: string | null;
+    avatar_refresh_at?: string | null;
+    avatar_undo_expires_at?: string | null;
+    avatar_refresh_day?: string | null;
+    avatar_filter_name?: string | null;
+    country_code?: string | null;
+    last_seen_at?: string | null;
+    date_of_birth?: string | null;
+    birth_place?: string | null;
     created_at?: string;
     updated_at?: string;
   };
@@ -31,8 +51,111 @@ type ProfilesTable = {
     email?: string;
     phone?: string;
     preferred_language?: string | null;
+    avatar_url?: string | null;
+    avatar_previous_url?: string | null;
+    avatar_refresh_at?: string | null;
+    avatar_undo_expires_at?: string | null;
+    avatar_refresh_day?: string | null;
+    avatar_filter_name?: string | null;
+    country_code?: string | null;
+    last_seen_at?: string | null;
+    date_of_birth?: string | null;
+    birth_place?: string | null;
     created_at?: string;
     updated_at?: string;
+  };
+  Relationships: [];
+};
+
+type DailyPredictionsTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    prediction_date: string;
+    zodiac_sign: string;
+    lucky_number: number;
+    lucky_color: string;
+    lucky_color_hex: string;
+    message: string;
+    score: number;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    prediction_date?: string;
+    zodiac_sign: string;
+    lucky_number: number;
+    lucky_color: string;
+    lucky_color_hex?: string;
+    message: string;
+    score?: number;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    prediction_date?: string;
+    zodiac_sign?: string;
+    lucky_number?: number;
+    lucky_color?: string;
+    lucky_color_hex?: string;
+    message?: string;
+    score?: number;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
+type BlockedUsersTable = {
+  Row: {
+    blocker_id: string;
+    blocked_id: string;
+    created_at: string;
+  };
+  Insert: {
+    blocker_id: string;
+    blocked_id: string;
+    created_at?: string;
+  };
+  Update: {
+    blocker_id?: string;
+    blocked_id?: string;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
+type NotificationsTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    type: string;
+    title: string;
+    body: string;
+    data: Json;
+    read: boolean;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    type?: string;
+    title: string;
+    body?: string;
+    data?: Json;
+    read?: boolean;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    type?: string;
+    title?: string;
+    body?: string;
+    data?: Json;
+    read?: boolean;
+    created_at?: string;
   };
   Relationships: [];
 };
@@ -192,6 +315,9 @@ type SubscriptionsTable = {
     status: string;
     expires_at: string | null;
     store_product_id: string | null;
+    stripe_customer_id: string | null;
+    stripe_subscription_id: string | null;
+    provider: string | null;
     updated_at: string;
   };
   Insert: {
@@ -200,6 +326,9 @@ type SubscriptionsTable = {
     status?: string;
     expires_at?: string | null;
     store_product_id?: string | null;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+    provider?: string | null;
     updated_at?: string;
   };
   Update: {
@@ -208,6 +337,9 @@ type SubscriptionsTable = {
     status?: string;
     expires_at?: string | null;
     store_product_id?: string | null;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+    provider?: string | null;
     updated_at?: string;
   };
   Relationships: [];
@@ -260,9 +392,51 @@ export type Database = {
       invites: InvitesTable;
       subscriptions: SubscriptionsTable;
       calls: CallsTable;
+      blocked_users: BlockedUsersTable;
+      notifications: NotificationsTable;
+      daily_predictions: DailyPredictionsTable;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      is_phone_taken: {
+        Args: { p_phone: string };
+        Returns: boolean;
+      };
+      is_email_taken: {
+        Args: { p_email: string };
+        Returns: boolean;
+      };
+      find_profiles_by_phones: {
+        Args: { p_phones: string[] };
+        Returns: { id: string; name: string; phone: string }[];
+      };
+      touch_presence: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      request_account_cleanup: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      clear_expired_avatar_undo: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      has_active_ai_entitlement: {
+        Args: { p_user_id?: string };
+        Returns: boolean;
+      };
+      create_notification: {
+        Args: {
+          p_user_id: string;
+          p_type: string;
+          p_title: string;
+          p_body?: string;
+          p_data?: Json;
+        };
+        Returns: string;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

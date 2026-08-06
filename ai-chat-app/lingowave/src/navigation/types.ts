@@ -38,6 +38,9 @@ export type AppStackParamList = {
   };
   Subscription: undefined;
   LanguageSettings: undefined;
+  EditProfile: undefined;
+  Notifications: undefined;
+  Privacy: undefined;
 };
 
 export type AuthStackParamList = {

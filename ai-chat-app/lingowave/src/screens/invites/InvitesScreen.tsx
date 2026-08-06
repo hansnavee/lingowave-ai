@@ -3,7 +3,6 @@ import {
   Alert,
   FlatList,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -19,6 +18,9 @@ import AppScreen from "../../components/ui/AppScreen";
 import AppText from "../../components/ui/AppText";
 import AppButton from "../../components/ui/AppButton";
 import AppInput from "../../components/ui/AppInput";
+import PhoneInput, {
+  DEFAULT_COUNTRY_CODE,
+} from "../../components/ui/PhoneInput";
 
 import { useAuthStore } from "../../store/authStore";
 import {
@@ -30,6 +32,11 @@ import {
 import type { Invite } from "../../types/models";
 import { ChatStackParamList } from "../../navigation/types";
 import { useTheme, Spacing, Typography } from "../../theme";
+import type { CountryCode } from "../../constants/countryCodes";
+import {
+  composeE164Phone,
+  validatePhone,
+} from "../../utils/validation";
 
 type NavigationProp = NativeStackNavigationProp<
   ChatStackParamList,
@@ -41,7 +48,9 @@ export default function InvitesScreen() {
   const { theme } = useTheme();
   const user = useAuthStore((state) => state.user);
 
-  const [phonesText, setPhonesText] = useState("");
+  const [country, setCountry] = useState<CountryCode>(DEFAULT_COUNTRY_CODE);
+  const [nationalNumber, setNationalNumber] = useState("");
+  const [phones, setPhones] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [outgoing, setOutgoing] = useState<Invite[]>([]);
   const [incoming, setIncoming] = useState<Invite[]>([]);
@@ -66,21 +75,50 @@ export default function InvitesScreen() {
     }, [refresh])
   );
 
+  const handleAddPhone = () => {
+    const composed = composeE164Phone(country.dialCode, nationalNumber);
+    const error = validatePhone(composed);
+    if (error) {
+      Alert.alert("Invalid phone", error);
+      return;
+    }
+    if (phones.includes(composed)) {
+      Alert.alert("Already added", "That number is already in the list.");
+      return;
+    }
+    setPhones((prev) => [...prev, composed]);
+    setNationalNumber("");
+  };
+
   const handleSend = async () => {
     if (!user) {
       return;
     }
 
+    let invitePhones = [...phones];
+    if (nationalNumber.trim()) {
+      const composed = composeE164Phone(country.dialCode, nationalNumber);
+      const error = validatePhone(composed);
+      if (error) {
+        Alert.alert("Invalid phone", error);
+        return;
+      }
+      if (!invitePhones.includes(composed)) {
+        invitePhones = [...invitePhones, composed];
+      }
+    }
+
+    if (invitePhones.length === 0) {
+      Alert.alert("Add a number", "Enter at least one phone number to invite.");
+      return;
+    }
+
     setLoading(true);
-    const phones = phonesText
-      .split(/[\n,;]+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
 
     const result = await createInvites({
       fromUserId: user.id,
       fromUserName: user.name,
-      phones,
+      phones: invitePhones,
       message,
     });
 
@@ -91,7 +129,8 @@ export default function InvitesScreen() {
       return;
     }
 
-    setPhonesText("");
+    setPhones([]);
+    setNationalNumber("");
     setMessage("");
     Alert.alert(
       "Invites sent",
@@ -146,29 +185,41 @@ export default function InvitesScreen() {
         </AppText>
 
         <AppText color={theme.colors.textSecondary} style={styles.subtitle}>
-          Enter phone numbers (one per line). Once they join, you can chat
-          freely. AI Translate is optional and paid.
+          Pick a country code and phone number. Once they join with that number,
+          you can chat freely. AI Translate is optional and paid.
         </AppText>
 
-        <AppText weight="600" style={styles.label}>
-          Phone numbers
-        </AppText>
-        <TextInput
-          value={phonesText}
-          onChangeText={setPhonesText}
-          placeholder={"+919876543210\n+14155552671"}
-          placeholderTextColor={theme.colors.placeholder}
-          multiline
-          style={[
-            styles.phonesInput,
-            {
-              backgroundColor: theme.colors.inputBackground,
-              borderColor: theme.colors.border,
-              color: theme.colors.textPrimary,
-              borderRadius: theme.radius.lg,
-            },
-          ]}
+        <PhoneInput
+          label="Phone number"
+          country={country}
+          nationalNumber={nationalNumber}
+          onCountryChange={setCountry}
+          onNationalNumberChange={setNationalNumber}
         />
+
+        <AppButton title="Add number" onPress={handleAddPhone} />
+
+        {phones.length > 0 ? (
+          <View style={styles.phoneChips}>
+            {phones.map((phone) => (
+              <TouchableOpacity
+                key={phone}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: theme.colors.card,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+                onPress={() =>
+                  setPhones((prev) => prev.filter((item) => item !== phone))
+                }
+              >
+                <AppText size={13}>{phone}  ×</AppText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
 
         <AppInput
           label="Optional message"
@@ -270,15 +321,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     lineHeight: 22,
   },
-  label: {
-    marginBottom: Spacing.sm,
-  },
-  phonesInput: {
-    minHeight: 96,
-    borderWidth: 1,
-    padding: Spacing.md,
-    textAlignVertical: "top",
+  phoneChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: Spacing.sm,
     marginBottom: Spacing.md,
+  },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   demo: {
     marginTop: Spacing.md,

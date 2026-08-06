@@ -8,6 +8,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { profileToAuthUser } from "../lib/mappers";
 import type { ProfileRow } from "../types/database";
+import { languageForCountryCode } from "../constants/countryLanguage";
 import {
   clearSession,
   saveSession,
@@ -60,6 +61,21 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
     throw new Error(error.message);
   }
 
+  if (
+    data &&
+    !data.preferred_language &&
+    data.country_code
+  ) {
+    const language = languageForCountryCode(data.country_code);
+    const { data: updated } = await supabase
+      .from("profiles")
+      .update({ preferred_language: language })
+      .eq("id", userId)
+      .select("*")
+      .single();
+    return updated ?? { ...data, preferred_language: language };
+  }
+
   return data;
 }
 
@@ -68,11 +84,53 @@ async function ensureProfile(params: {
   email: string;
   name?: string;
   phone?: string;
+  countryCode?: string;
+  preferredLanguage?: string;
+  dateOfBirth?: string;
+  birthPlace?: string;
 }): Promise<ProfileRow | null> {
   try {
     const existing = await fetchProfile(params.id);
 
     if (existing) {
+      const patch: {
+        name?: string;
+        phone?: string;
+        country_code?: string;
+        preferred_language?: string;
+        date_of_birth?: string;
+        birth_place?: string;
+      } = {};
+
+      if (params.name && !existing.name) {
+        patch.name = params.name;
+      }
+      if (params.phone && !existing.phone) {
+        patch.phone = normalizePhone(params.phone);
+      }
+      if (params.countryCode && !existing.country_code) {
+        patch.country_code = params.countryCode;
+      }
+      if (params.preferredLanguage && !existing.preferred_language) {
+        patch.preferred_language = params.preferredLanguage;
+      }
+      if (params.dateOfBirth && !existing.date_of_birth) {
+        patch.date_of_birth = params.dateOfBirth;
+      }
+      if (params.birthPlace && !existing.birth_place) {
+        patch.birth_place = params.birthPlace.trim();
+      }
+
+      if (Object.keys(patch).length > 0) {
+        const { data } = await supabase
+          .from("profiles")
+          .update(patch)
+          .eq("id", params.id)
+          .select("*")
+          .single();
+        return data ?? existing;
+      }
+
       return existing;
     }
   } catch (error) {
@@ -82,6 +140,10 @@ async function ensureProfile(params: {
     );
   }
 
+  const preferred =
+    params.preferredLanguage ??
+    languageForCountryCode(params.countryCode);
+
   const { data, error } = await supabase
     .from("profiles")
     .upsert(
@@ -90,6 +152,10 @@ async function ensureProfile(params: {
         email: params.email.trim().toLowerCase(),
         name: params.name?.trim() || params.email.split("@")[0] || "User",
         phone: params.phone ? normalizePhone(params.phone) : "",
+        country_code: params.countryCode ?? null,
+        preferred_language: preferred,
+        date_of_birth: params.dateOfBirth ?? null,
+        birth_place: params.birthPlace?.trim() || null,
       },
       { onConflict: "id" }
     )
@@ -108,13 +174,24 @@ async function buildSession(
   accessToken: string,
   userId: string,
   email: string,
-  meta?: { name?: string; phone?: string }
+  meta?: {
+    name?: string;
+    phone?: string;
+    countryCode?: string;
+    preferredLanguage?: string;
+    dateOfBirth?: string;
+    birthPlace?: string;
+  }
 ): Promise<SessionPayload | null> {
   const profile = await ensureProfile({
     id: userId,
     email,
     name: meta?.name,
     phone: meta?.phone,
+    countryCode: meta?.countryCode,
+    preferredLanguage: meta?.preferredLanguage,
+    dateOfBirth: meta?.dateOfBirth,
+    birthPlace: meta?.birthPlace,
   });
 
   if (!profile) {
@@ -177,9 +254,19 @@ export async function signupRequest(
   name: string,
   email: string,
   password: string,
-  phone: string
+  phone: string,
+  countryCode?: string,
+  dateOfBirth?: string,
+  birthPlace?: string
 ): Promise<AuthResult> {
-  const validationError = validateSignup(name, email, password, phone);
+  const validationError = validateSignup(
+    name,
+    email,
+    password,
+    phone,
+    dateOfBirth,
+    birthPlace
+  );
 
   if (validationError) {
     return { ok: false, error: validationError };
@@ -187,6 +274,32 @@ export async function signupRequest(
 
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedPhone = normalizePhone(phone);
+  const preferredLanguage = languageForCountryCode(countryCode);
+  const dob = dateOfBirth!.trim();
+  const place = birthPlace!.trim();
+
+  const [{ data: phoneTaken, error: phoneCheckError }, { data: emailTaken }] =
+    await Promise.all([
+      supabase.rpc("is_phone_taken", { p_phone: normalizedPhone }),
+      supabase.rpc("is_email_taken", { p_email: normalizedEmail }),
+    ]);
+
+  if (phoneCheckError) {
+    console.warn("Phone uniqueness check failed:", phoneCheckError.message);
+  } else if (phoneTaken) {
+    return {
+      ok: false,
+      error:
+        "This phone number is already registered. Sign in or use another number.",
+    };
+  }
+
+  if (emailTaken) {
+    return {
+      ok: false,
+      error: "This email is already registered. Sign in or use another email.",
+    };
+  }
 
   const { data, error } = await supabase.auth.signUp({
     email: normalizedEmail,
@@ -195,6 +308,10 @@ export async function signupRequest(
       data: {
         name: name.trim(),
         phone: normalizedPhone,
+        country_code: countryCode ?? null,
+        preferred_language: preferredLanguage,
+        date_of_birth: dob,
+        birth_place: place,
       },
     },
   });
@@ -216,7 +333,14 @@ export async function signupRequest(
       data.session.access_token,
       data.user.id,
       data.user.email ?? normalizedEmail,
-      { name: name.trim(), phone: normalizedPhone }
+      {
+        name: name.trim(),
+        phone: normalizedPhone,
+        countryCode,
+        preferredLanguage,
+        dateOfBirth: dob,
+        birthPlace: place,
+      }
     );
 
     if (!session) {
@@ -239,7 +363,18 @@ export async function signupRequest(
 }
 
 export async function updateUserProfile(
-  patch: Partial<Pick<AuthUser, "name" | "phone" | "preferredLanguage">>
+  patch: Partial<
+    Pick<
+      AuthUser,
+      | "name"
+      | "phone"
+      | "preferredLanguage"
+      | "avatarUrl"
+      | "countryCode"
+      | "dateOfBirth"
+      | "birthPlace"
+    >
+  >
 ): Promise<AuthResult> {
   const {
     data: { session: authSession },
@@ -253,6 +388,10 @@ export async function updateUserProfile(
     name?: string;
     phone?: string;
     preferred_language?: string | null;
+    avatar_url?: string | null;
+    country_code?: string | null;
+    date_of_birth?: string | null;
+    birth_place?: string | null;
   } = {};
 
   if (patch.name !== undefined) {
@@ -260,11 +399,47 @@ export async function updateUserProfile(
   }
 
   if (patch.phone !== undefined) {
-    updates.phone = normalizePhone(patch.phone);
+    const nextPhone = normalizePhone(patch.phone);
+    const { data: phoneTaken } = await supabase.rpc("is_phone_taken", {
+      p_phone: nextPhone,
+    });
+
+    if (phoneTaken) {
+      const { data: mine } = await supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", authSession.user.id)
+        .maybeSingle();
+
+      if (mine?.phone !== nextPhone) {
+        return {
+          ok: false,
+          error: "This phone number is already registered to another account.",
+        };
+      }
+    }
+
+    updates.phone = nextPhone;
   }
 
   if (patch.preferredLanguage !== undefined) {
     updates.preferred_language = patch.preferredLanguage;
+  }
+
+  if (patch.avatarUrl !== undefined) {
+    updates.avatar_url = patch.avatarUrl;
+  }
+
+  if (patch.countryCode !== undefined) {
+    updates.country_code = patch.countryCode;
+  }
+
+  if (patch.dateOfBirth !== undefined) {
+    updates.date_of_birth = patch.dateOfBirth.trim() || null;
+  }
+
+  if (patch.birthPlace !== undefined) {
+    updates.birth_place = patch.birthPlace.trim() || null;
   }
 
   const { data, error } = await supabase
@@ -288,6 +463,31 @@ export async function updateUserProfile(
 
   await saveSession(session);
   return { ok: true, session };
+}
+
+export async function deleteAccountRequest(): Promise<SimpleResult> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  const { data, error } = await supabase.functions.invoke("delete-account", {
+    method: "POST",
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  if (data && typeof data === "object" && "error" in data && data.error) {
+    return { ok: false, error: String(data.error) };
+  }
+
+  await clearSession();
+  return { ok: true, message: "Account deleted." };
 }
 
 export async function resetPasswordRequest(

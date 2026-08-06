@@ -4,6 +4,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Image,
+  Linking,
   Platform,
   StyleSheet,
   View,
@@ -41,6 +42,18 @@ import PaywallSheet from "../../components/subscription/PaywallSheet";
 import { pickImage } from "../../utils/imagePicker";
 import { openCamera } from "../../utils/cameraPicker";
 import { pickDocument } from "../../utils/documentPicker";
+import {
+  decodeLocationContent,
+  encodeLocationContent,
+  getCurrentShareLocation,
+} from "../../utils/locationShare";
+import { uploadChatFile } from "../../services/storageService";
+import {
+  getLastSeenMap,
+  isOnlineFromLastSeen,
+} from "../../services/presenceService";
+import { blockUser } from "../../repositories/blockRepository";
+import { supabase } from "../../lib/supabase";
 
 import { useTheme, Spacing } from "../../theme";
 import {
@@ -102,7 +115,7 @@ export default function ChatScreen() {
     return new Date(sub.expiresAt).getTime() > Date.now();
   });
 
-  const { userId, userName, status } = route.params;
+  const { userId, userName } = route.params;
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -122,6 +135,9 @@ export default function ChatScreen() {
     {}
   );
   const [translating, setTranslating] = useState(false);
+  const [peerOnline, setPeerOnline] = useState(false);
+  const [peerAvatarUrl, setPeerAvatarUrl] = useState<string | undefined>();
+  const [peerUserId, setPeerUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -139,12 +155,21 @@ export default function ChatScreen() {
           setTranslating(true);
           const translated: Message[] = [];
           for (const message of data) {
-            translated.push(
-              await translateMessageForUser({
-                message,
-                targetLanguage: user.preferredLanguage,
-              })
-            );
+            const next = await translateMessageForUser({
+              message,
+              targetLanguage: user.preferredLanguage,
+            });
+            translated.push(next);
+            if (
+              next.translations?.[user.preferredLanguage] &&
+              next.translations[user.preferredLanguage] !==
+                message.translations?.[user.preferredLanguage]
+            ) {
+              void updateMessage(next.id, {
+                translations: next.translations,
+                content: next.content,
+              });
+            }
           }
           if (active) {
             setMessages(translated);
@@ -160,6 +185,58 @@ export default function ChatScreen() {
       active = false;
     };
   }, [userId, user?.preferredLanguage, entitled]);
+
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const refreshPeer = async () => {
+      const otherId = await getOtherChatMemberId(userId);
+      if (!active || !otherId) {
+        return;
+      }
+
+      setPeerUserId(otherId);
+      const map = await getLastSeenMap([otherId]);
+      if (!active) {
+        return;
+      }
+
+      setPeerOnline(isOnlineFromLastSeen(map[otherId]));
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("avatar_url, last_seen_at")
+        .eq("id", otherId)
+        .maybeSingle();
+
+      if (!active) {
+        return;
+      }
+
+      if (data) {
+        setPeerAvatarUrl(data.avatar_url ?? undefined);
+        setPeerOnline(
+          isOnlineFromLastSeen(
+            (data as { last_seen_at?: string | null }).last_seen_at ??
+              map[otherId]
+          )
+        );
+      }
+    };
+
+    void refreshPeer();
+    timer = setInterval(() => {
+      void refreshPeer();
+    }, 30_000);
+
+    return () => {
+      active = false;
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [userId]);
 
   const scrollToEnd = () => {
     setTimeout(() => {
@@ -184,12 +261,21 @@ export default function ChatScreen() {
     setTranslating(true);
     const translated: Message[] = [];
     for (const message of messages) {
-      translated.push(
-        await translateMessageForUser({
-          message,
-          targetLanguage: user!.preferredLanguage!,
-        })
-      );
+      const next = await translateMessageForUser({
+        message,
+        targetLanguage: user!.preferredLanguage!,
+      });
+      translated.push(next);
+      if (
+        user?.preferredLanguage &&
+        next.translations?.[user.preferredLanguage] &&
+        next.translations[user.preferredLanguage] !==
+          message.translations?.[user.preferredLanguage]
+      ) {
+        void updateMessage(next.id, {
+          translations: next.translations,
+        });
+      }
     }
     setMessages(translated);
     setTranslating(false);
@@ -223,19 +309,25 @@ export default function ChatScreen() {
       const file = await pickDocument();
       if (!file) return;
 
+      const uploaded = await uploadChatFile({
+        localUri: file.uri,
+        chatId: userId,
+        fileName: file.name,
+      });
+
       await appendMessage({
         id: Date.now().toString(),
         type: "file",
-        content: file.uri,
-        fileName: file.name,
-        fileSize: file.size ?? undefined,
+        content: uploaded.url,
+        fileName: uploaded.fileName,
+        fileSize: uploaded.fileSize ?? file.size ?? undefined,
         time: "Now",
         isMe: true,
       });
 
       setAttachmentVisible(false);
     } catch {
-      Alert.alert("Document failed", "Could not attach this document.");
+      Alert.alert("Document failed", "Could not upload this document.");
     }
   };
 
@@ -244,10 +336,16 @@ export default function ChatScreen() {
       const image = await openCamera();
       if (!image) return;
 
+      const uploaded = await uploadChatFile({
+        localUri: image.uri,
+        chatId: userId,
+        fileName: `photo-${Date.now()}.jpg`,
+      });
+
       await appendMessage({
         id: Date.now().toString(),
         type: "image",
-        content: image.uri,
+        content: uploaded.url,
         time: "Now",
         isMe: true,
       });
@@ -263,10 +361,16 @@ export default function ChatScreen() {
       const image = await pickImage();
       if (!image) return;
 
+      const uploaded = await uploadChatFile({
+        localUri: image.uri,
+        chatId: userId,
+        fileName: `image-${Date.now()}.jpg`,
+      });
+
       await appendMessage({
         id: Date.now().toString(),
         type: "image",
-        content: image.uri,
+        content: uploaded.url,
         time: "Now",
         isMe: true,
       });
@@ -278,6 +382,54 @@ export default function ChatScreen() {
         "Allow photo library access to send images."
       );
     }
+  };
+
+  const handleLocation = async () => {
+    try {
+      const location = await getCurrentShareLocation();
+      await appendMessage({
+        id: Date.now().toString(),
+        type: "location",
+        content: encodeLocationContent(location),
+        originalText: location.label,
+        time: "Now",
+        isMe: true,
+      });
+      setAttachmentVisible(false);
+    } catch {
+      Alert.alert(
+        "Location unavailable",
+        "Allow location access to share where you are."
+      );
+    }
+  };
+
+  const handleBlockUser = () => {
+    if (!peerUserId) {
+      Alert.alert("Unavailable", "Could not find this contact to block.");
+      return;
+    }
+
+    Alert.alert(
+      "Block user",
+      `Block ${userName}? You won’t see their chats anymore.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            const result = await blockUser(peerUserId);
+            if (!result.ok) {
+              Alert.alert("Failed", result.error);
+              return;
+            }
+            Alert.alert("Blocked", `${userName} has been blocked.`);
+            navigation.goBack();
+          },
+        },
+      ]
+    );
   };
 
   const handleSend = async () => {
@@ -419,7 +571,12 @@ export default function ChatScreen() {
 
     if (item.type === "file") {
       return (
-        <View
+        <TouchableOpacity
+          onPress={() => {
+            if (item.content) {
+              void Linking.openURL(item.content);
+            }
+          }}
           style={[
             styles.fileBubble,
             {
@@ -452,7 +609,52 @@ export default function ChatScreen() {
               {formatFileSize(item.fileSize)}
             </AppText>
           ) : null}
-        </View>
+        </TouchableOpacity>
+      );
+    }
+
+    if (item.type === "location") {
+      const location = decodeLocationContent(item.content);
+      return (
+        <TouchableOpacity
+          onPress={() => {
+            if (!location) {
+              return;
+            }
+            const url = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+            void Linking.openURL(url);
+          }}
+          style={[
+            styles.fileBubble,
+            {
+              alignSelf: item.isMe ? "flex-end" : "flex-start",
+              backgroundColor: item.isMe
+                ? theme.colors.bubbleMe
+                : theme.colors.bubbleOther,
+            },
+          ]}
+        >
+          <AppText
+            color={
+              item.isMe
+                ? theme.colors.onBubbleMe
+                : theme.colors.onBubbleOther
+            }
+            weight="700"
+          >
+            📍 {location?.label ?? "Shared location"}
+          </AppText>
+          <AppText
+            size={12}
+            color={
+              item.isMe
+                ? theme.colors.onBubbleMe
+                : theme.colors.textSecondary
+            }
+          >
+            Tap to open in Maps
+          </AppText>
+        </TouchableOpacity>
       );
     }
 
@@ -469,16 +671,14 @@ export default function ChatScreen() {
         >
           <ChatHeader
             name={userName}
-            online={
-              !status ||
-              status.toLowerCase() === "online" ||
-              status === "Always available"
-            }
+            online={peerOnline}
+            avatarUrl={peerAvatarUrl}
             translateEnabled={translateEnabled}
             onBack={() => navigation.goBack()}
             onToggleTranslate={handleToggleTranslate}
             onAudioCall={() => openCall("AudioCall")}
             onVideoCall={() => openCall("CallVideo")}
+            onBlockUser={handleBlockUser}
           />
 
           {translating ? (
@@ -536,7 +736,7 @@ export default function ChatScreen() {
           setAttachmentVisible(false);
           setVoiceVisible(true);
         }}
-        onLocation={() => comingSoon("Location sharing")}
+        onLocation={handleLocation}
         onContact={() => comingSoon("Contact sharing")}
       />
 
@@ -552,14 +752,23 @@ export default function ChatScreen() {
         visible={voiceVisible}
         onClose={() => setVoiceVisible(false)}
         onSend={async (uri) => {
-          await appendMessage({
-            id: Date.now().toString(),
-            type: "audio",
-            content: uri,
-            originalText: "Voice message",
-            time: "Now",
-            isMe: true,
-          });
+          try {
+            const uploaded = await uploadChatFile({
+              localUri: uri,
+              chatId: userId,
+              fileName: `voice-${Date.now()}.m4a`,
+            });
+            await appendMessage({
+              id: Date.now().toString(),
+              type: "audio",
+              content: uploaded.url,
+              originalText: "Voice message",
+              time: "Now",
+              isMe: true,
+            });
+          } catch {
+            Alert.alert("Upload failed", "Could not send voice message.");
+          }
           setVoiceVisible(false);
         }}
       />

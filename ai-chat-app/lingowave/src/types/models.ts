@@ -16,6 +16,15 @@ export type AuthUser = {
   email: string;
   phone: string;
   preferredLanguage?: PreferredLanguage;
+  avatarUrl?: string;
+  avatarPreviousUrl?: string;
+  avatarRefreshAt?: string;
+  avatarUndoExpiresAt?: string;
+  avatarRefreshDay?: string;
+  avatarFilterName?: string;
+  countryCode?: string;
+  dateOfBirth?: string;
+  birthPlace?: string;
   createdAt: string;
 };
 
@@ -38,7 +47,13 @@ export type ChatUser = {
   phone?: string;
 };
 
-export type MessageType = "text" | "image" | "audio" | "file" | "system";
+export type MessageType =
+  | "text"
+  | "image"
+  | "audio"
+  | "file"
+  | "location"
+  | "system";
 
 export type Message = {
   id: string;

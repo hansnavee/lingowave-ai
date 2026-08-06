@@ -1,9 +1,5 @@
 import React, { useState } from "react";
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-} from "react-native";
+import { Alert, ScrollView, StyleSheet } from "react-native";
 
 import {
   CompositeNavigationProp,
@@ -13,7 +9,6 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 
 import AppScreen from "../../components/ui/AppScreen";
-
 import ProfileHeader from "../../components/profile/ProfileHeader";
 import ProfileMenuItem from "../../components/profile/ProfileMenuItem";
 import LogoutButton from "../../components/profile/LogoutButton";
@@ -40,12 +35,25 @@ export default function ProfileScreen() {
   const logout = useAuthStore((state) => state.logout);
   const subscription = useSubscriptionStore((state) => state.subscription);
   const isEntitled = useSubscriptionStore((state) => state.isEntitled);
+  const aiEnabled = isEntitled();
 
-  const comingSoon = (feature: string) => {
-    Alert.alert(
-      "Coming soon",
-      `${feature} will be available in a future update.`
-    );
+  const handleLanguagePress = () => {
+    if (!aiEnabled) {
+      Alert.alert(
+        "Language locked",
+        `Your language is ${getLanguageLabel(user?.preferredLanguage)} based on the country you chose at signup. Subscribe to AI Translate to change it.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Subscribe",
+            onPress: () => navigation.navigate("Subscription"),
+          },
+        ]
+      );
+      return;
+    }
+
+    navigation.navigate("LanguageSettings");
   };
 
   return (
@@ -63,18 +71,21 @@ export default function ProfileScreen() {
               ? `${user.email} · ${user.phone}`
               : "guest@email.com"
           }
+          avatarUrl={user?.avatarUrl}
         />
 
         <ProfileMenuItem
           icon="🌐"
-          title={`Language: ${getLanguageLabel(user?.preferredLanguage)}`}
-          onPress={() => navigation.navigate("LanguageSettings")}
+          title={`Language: ${getLanguageLabel(user?.preferredLanguage)}${
+            aiEnabled ? "" : " · locked"
+          }`}
+          onPress={handleLanguagePress}
         />
 
         <ProfileMenuItem
           icon="✨"
           title={
-            isEntitled()
+            aiEnabled
               ? `AI Translate · ${subscription?.plan ?? "active"}`
               : "AI Translate · Subscribe"
           }
@@ -84,13 +95,13 @@ export default function ProfileScreen() {
         <ProfileMenuItem
           icon="👤"
           title="Edit Profile"
-          onPress={() => comingSoon("Edit Profile")}
+          onPress={() => navigation.navigate("EditProfile")}
         />
 
         <ProfileMenuItem
           icon="🔔"
           title="Notifications"
-          onPress={() => comingSoon("Notifications")}
+          onPress={() => navigation.navigate("Notifications")}
         />
 
         <ProfileMenuItem
@@ -102,7 +113,7 @@ export default function ProfileScreen() {
         <ProfileMenuItem
           icon="🔒"
           title="Privacy"
-          onPress={() => comingSoon("Privacy")}
+          onPress={() => navigation.navigate("Privacy")}
         />
 
         <LogoutButton

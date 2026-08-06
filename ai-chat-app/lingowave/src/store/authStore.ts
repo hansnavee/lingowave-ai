@@ -26,9 +26,14 @@ interface AuthState {
     name: string,
     email: string,
     password: string,
-    phone: string
+    phone: string,
+    countryCode?: string,
+    dateOfBirth?: string,
+    birthPlace?: string
   ) => Promise<boolean>;
   setPreferredLanguage: (language: PreferredLanguage) => Promise<boolean>;
+  refreshUser: () => Promise<void>;
+  setUser: (user: AuthUser) => void;
   requestPasswordReset: (email: string) => Promise<string | null>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -55,6 +60,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           status: "authenticated",
           user: session.user,
           isLoggedIn: true,
+          // Language is set from signup country; only gate if somehow missing
           needsLanguageSetup: !session.user.preferredLanguage,
           error: null,
         });
@@ -116,11 +122,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  signup: async (name, email, password, phone) => {
+  signup: async (name, email, password, phone, countryCode, dateOfBirth, birthPlace) => {
     set({ isLoading: true, error: null });
 
     try {
-      const result = await signupRequest(name, email, password, phone);
+      const result = await signupRequest(
+        name,
+        email,
+        password,
+        phone,
+        countryCode,
+        dateOfBirth,
+        birthPlace
+      );
 
       if (!result.ok) {
         set({
@@ -138,7 +152,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         status: "authenticated",
         user: result.session.user,
         isLoggedIn: true,
-        needsLanguageSetup: true,
+        // Country language applied at signup — skip picker
+        needsLanguageSetup: !result.session.user.preferredLanguage,
         error: null,
       });
 
@@ -177,6 +192,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
 
     return true;
+  },
+
+  refreshUser: async () => {
+    const session = await restoreSession();
+    if (session) {
+      set({
+        user: session.user,
+        needsLanguageSetup: !session.user.preferredLanguage,
+      });
+    }
+  },
+
+  setUser: (user) => {
+    set({ user });
   },
 
   requestPasswordReset: async (email) => {

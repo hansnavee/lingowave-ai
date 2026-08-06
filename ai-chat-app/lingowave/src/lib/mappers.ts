@@ -33,6 +33,15 @@ export function profileToAuthUser(profile: ProfileRow): AuthUser {
     email: profile.email,
     phone: profile.phone,
     preferredLanguage: toPreferredLanguage(profile.preferred_language),
+    avatarUrl: profile.avatar_url ?? undefined,
+    avatarPreviousUrl: profile.avatar_previous_url ?? undefined,
+    avatarRefreshAt: profile.avatar_refresh_at ?? undefined,
+    avatarUndoExpiresAt: profile.avatar_undo_expires_at ?? undefined,
+    avatarRefreshDay: profile.avatar_refresh_day ?? undefined,
+    avatarFilterName: profile.avatar_filter_name ?? undefined,
+    countryCode: profile.country_code ?? undefined,
+    dateOfBirth: profile.date_of_birth ?? undefined,
+    birthPlace: profile.birth_place ?? undefined,
     createdAt: profile.created_at,
   };
 }

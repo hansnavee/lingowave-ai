@@ -71,7 +71,9 @@ export async function sendMessage(
           ? "🎤 Voice message"
           : message.type === "file"
             ? `📎 ${message.fileName ?? "File"}`
-            : message.content;
+            : message.type === "location"
+              ? "📍 Location"
+              : message.content;
 
   await supabase
     .from("chats")
