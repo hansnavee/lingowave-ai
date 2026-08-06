@@ -1,10 +1,6 @@
-import * as WebBrowser from "expo-web-browser";
-
 import type { SubscriptionPlan } from "../types/models";
 import { supabase } from "../lib/supabase";
 import { syncSubscriptionFromServer } from "./subscriptionService";
-
-WebBrowser.maybeCompleteAuthSession();
 
 const SUCCESS_URL = "lingowave://subscription?status=success";
 const CANCEL_URL = "lingowave://subscription?status=cancel";
@@ -29,6 +25,10 @@ export async function purchaseViaStore(
   plan: SubscriptionPlan
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
+    // Lazy-load so browser native code is not touched at app import time.
+    const WebBrowser = await import("expo-web-browser");
+    WebBrowser.maybeCompleteAuthSession();
+
     const {
       data: { session },
     } = await supabase.auth.getSession();

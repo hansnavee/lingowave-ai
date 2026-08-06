@@ -6,7 +6,6 @@ import {
   hasActiveEntitlement,
   restoreSubscription,
 } from "../services/subscriptionService";
-import { purchaseViaStore } from "../services/billingBridge";
 
 interface SubscriptionState {
   subscription: Subscription | null;
@@ -36,6 +35,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      const { purchaseViaStore } = await import("../services/billingBridge");
       const storeResult = await purchaseViaStore(plan);
 
       if (!storeResult.ok) {

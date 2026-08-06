@@ -2,10 +2,6 @@ import React, { useEffect } from "react";
 import { ActivityIndicator, Image, View, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 
-import AuthNavigator from "./AuthNavigator";
-import AppStackNavigator from "./AppStackNavigator";
-import LanguageSetupScreen from "../screens/onboarding/LanguageSetupScreen";
-
 import { useAuthStore } from "../store/authStore";
 import { useSubscriptionStore } from "../store/subscriptionStore";
 import { useTheme, Typography } from "../theme";
@@ -13,6 +9,26 @@ import AppText from "../components/ui/AppText";
 import { APP_NAME } from "../constants/branding";
 
 const LOGO = require("../../assets/branding/lingowave-logo.png");
+
+function AuthTree() {
+  // Lazy require so media-heavy App stack is not evaluated on cold start.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AuthNavigator = require("./AuthNavigator").default;
+  return <AuthNavigator />;
+}
+
+function AppTree() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AppStackNavigator = require("./AppStackNavigator").default;
+  return <AppStackNavigator />;
+}
+
+function LanguageTree() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const LanguageSetupScreen =
+    require("../screens/onboarding/LanguageSetupScreen").default;
+  return <LanguageSetupScreen />;
+}
 
 export default function RootNavigator() {
   const status = useAuthStore((state) => state.status);
@@ -64,12 +80,12 @@ export default function RootNavigator() {
     <NavigationContainer>
       {status === "authenticated" ? (
         needsLanguageSetup ? (
-          <LanguageSetupScreen />
+          <LanguageTree />
         ) : (
-          <AppStackNavigator />
+          <AppTree />
         )
       ) : (
-        <AuthNavigator />
+        <AuthTree />
       )}
     </NavigationContainer>
   );

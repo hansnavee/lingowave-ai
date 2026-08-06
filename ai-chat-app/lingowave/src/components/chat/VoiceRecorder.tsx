@@ -53,8 +53,8 @@ export default function VoiceRecorder({
 
       if (!started) {
         Alert.alert(
-          "Microphone unavailable",
-          "Allow microphone access to record a voice message."
+          "Voice recording unavailable",
+          "Voice notes are temporarily disabled on this build."
         );
         onClose();
         return;

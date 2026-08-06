@@ -2,7 +2,7 @@
   "expo": {
     "name": "LingoWave",
     "slug": "lingowave",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "scheme": "lingowave",
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
@@ -20,18 +20,13 @@
     },
     "android": {
       "package": "com.lingowave.app",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#CCFBF1",
         "foregroundImage": "./assets/branding/lingowave-logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_CONNECT",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.READ_CONTACTS",
@@ -48,7 +43,6 @@
     "plugins": [
       "expo-secure-store",
       "expo-font",
-      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -68,22 +62,8 @@
         "expo-image-picker",
         {
           "photosPermission": "LingoWave needs photo library access so you can share images in chats.",
-          "cameraPermission": "LingoWave needs camera access for video calls and to send photos in chats.",
-          "microphonePermission": "LingoWave needs microphone access for voice calls and voice messages."
-        }
-      ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "LingoWave needs microphone access for voice calls and voice messages."
-        }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "LingoWave needs camera access for video calls.",
-          "microphonePermission": "LingoWave needs microphone access for video calls.",
-          "recordAudioAndroid": true
+          "cameraPermission": "LingoWave needs camera access to send photos in chats.",
+          "microphonePermission": "LingoWave needs microphone access for voice messages."
         }
       ],
       [

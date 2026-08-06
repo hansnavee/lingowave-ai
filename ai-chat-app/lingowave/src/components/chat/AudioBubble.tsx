@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import {
   Alert,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
-
-import { Audio } from "expo-av";
 
 import AppText from "../ui/AppText";
 import { useTheme, Spacing } from "../../theme";
@@ -16,51 +14,9 @@ interface Props {
   isMe: boolean;
 }
 
-export default function AudioBubble({ uri, isMe }: Props) {
+/** Playback stub — expo-av removed from Android APK to stop cold-start crashes. */
+export default function AudioBubble({ isMe }: Props) {
   const { theme } = useTheme();
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      const sound = soundRef.current;
-      soundRef.current = null;
-
-      if (sound) {
-        sound.unloadAsync().catch(() => undefined);
-      }
-    };
-  }, []);
-
-  const playAudio = async () => {
-    try {
-      if (playing && soundRef.current) {
-        await soundRef.current.stopAsync();
-        setPlaying(false);
-        return;
-      }
-
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      soundRef.current = sound;
-      setPlaying(true);
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPlaying(false);
-        }
-      });
-
-      await sound.playAsync();
-    } catch {
-      setPlaying(false);
-      Alert.alert("Playback failed", "Could not play this audio message.");
-    }
-  };
 
   return (
     <View
@@ -74,14 +30,21 @@ export default function AudioBubble({ uri, isMe }: Props) {
         },
       ]}
     >
-      <TouchableOpacity onPress={playAudio}>
+      <TouchableOpacity
+        onPress={() =>
+          Alert.alert(
+            "Voice playback unavailable",
+            "Audio playback is temporarily disabled on this build."
+          )
+        }
+      >
         <AppText
           color={
             isMe ? theme.colors.onBubbleMe : theme.colors.textSecondary
           }
           weight="700"
         >
-          {playing ? "⏸ Pause" : "▶ Play"}
+          ▶ Voice note
         </AppText>
       </TouchableOpacity>
     </View>

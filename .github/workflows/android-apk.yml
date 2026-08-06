@@ -68,6 +68,7 @@ jobs:
           eas build \
             --platform android \
             --profile "$PROFILE" \
+            --clear-cache \
             --non-interactive \
             --no-wait
 
