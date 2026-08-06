@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/branding/lingowave-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#E8F5F2"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lingowave.app",
@@ -52,7 +47,17 @@
     },
     "plugins": [
       "expo-secure-store",
+      "expo-font",
       "expo-dev-client",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/branding/lingowave-logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#E8F5F2"
+        }
+      ],
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       [
