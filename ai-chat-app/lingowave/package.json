@@ -3,11 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@config-plugins/react-native-webrtc": "^15.0.1",
     "@expo/vector-icons": "^15.0.2",
-    "@livekit/react-native": "^2.12.0",
-    "@livekit/react-native-expo-plugin": "^1.0.2",
-    "@livekit/react-native-webrtc": "^144.1.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.18.14",
     "@react-navigation/native": "^7.3.14",
@@ -29,7 +25,6 @@
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.2",
-    "livekit-client": "^2.21.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
@@ -62,8 +57,7 @@
     "doctor": {
       "reactNativeDirectoryCheck": {
         "exclude": [
-          "expo-av",
-          "@livekit/react-native-expo-plugin"
+          "expo-av"
         ],
         "listUnknownPackages": false
       }
