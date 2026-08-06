@@ -25,6 +25,7 @@
     },
     "android": {
       "package": "com.lingowave.app",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#CCFBF1",
         "foregroundImage": "./assets/branding/lingowave-logo.png"
