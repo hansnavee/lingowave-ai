@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lingowave.app",
@@ -101,11 +100,7 @@
         {
           "android": {
             "usesCleartextTraffic": true,
-            "newArchEnabled": false,
             "minSdkVersion": 24
-          },
-          "ios": {
-            "newArchEnabled": false
           }
         }
       ]
