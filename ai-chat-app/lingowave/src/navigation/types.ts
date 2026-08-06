@@ -1,4 +1,4 @@
-import { NavigatorScreenParams } from "@react-navigation/native";
+import type { NavigatorScreenParams } from "./jsNavigation";
 
 export type ChatStackParamList = {
   ChatList: undefined;

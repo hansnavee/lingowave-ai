@@ -1,0 +1,1 @@
+export { createBottomTabNavigator } from "../jsNavigation";
