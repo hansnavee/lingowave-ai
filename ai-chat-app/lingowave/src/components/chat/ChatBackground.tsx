@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  ImageBackground,
-  StyleSheet,
-} from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { useTheme } from "../../theme";
 
@@ -10,27 +7,19 @@ interface ChatBackgroundProps {
   children: React.ReactNode;
 }
 
-const lightBackground = require("../../assets/images/chat-bg-light.png");
-const darkBackground = require("../../assets/images/chat-bg-dark.png");
-
-export default function ChatBackground({
-  children,
-}: ChatBackgroundProps) {
-
-  const { darkMode } = useTheme();
+/** Solid color only — large PNG backgrounds OOM older Android devices. */
+export default function ChatBackground({ children }: ChatBackgroundProps) {
+  const { theme } = useTheme();
 
   return (
-    <ImageBackground
-      source={
-        darkMode
-          ? darkBackground
-          : lightBackground
-      }
-      resizeMode="cover"
-      style={styles.container}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+      ]}
     >
       {children}
-    </ImageBackground>
+    </View>
   );
 }
 

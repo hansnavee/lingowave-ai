@@ -2,7 +2,7 @@
   "expo": {
     "name": "LingoWave",
     "slug": "lingowave",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "scheme": "lingowave",
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.lingowave.app",
-      "versionCode": 10,
+      "versionCode": 11,
       "adaptiveIcon": {
         "backgroundColor": "#CCFBF1",
         "foregroundImage": "./assets/branding/lingowave-logo.png"
