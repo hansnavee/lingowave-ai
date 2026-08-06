@@ -5,18 +5,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import {
-  LiveKitRoom,
-  VideoTrack,
-  useLocalParticipant,
-  useParticipants,
-  useRoomContext,
-  useTracks,
-  isTrackReference,
-} from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { useNavigation } from "@react-navigation/native";
 
+import { ensureLiveKitReady } from "../../lib/livekitInit";
 import AppText from "../ui/AppText";
 import { useTheme, Typography } from "../../theme";
 import {
@@ -27,6 +19,20 @@ import {
 import { subscribeIncomingCalls } from "../../repositories/callRepository";
 import { useAuthStore } from "../../store/authStore";
 import type { CallType, LiveKitCredentials } from "../../types/calls";
+
+// Init WebRTC globals before LiveKit hooks/components are used.
+ensureLiveKitReady();
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const {
+  LiveKitRoom,
+  VideoTrack,
+  useLocalParticipant,
+  useParticipants,
+  useRoomContext,
+  useTracks,
+  isTrackReference,
+} = require("@livekit/react-native") as typeof import("@livekit/react-native");
 
 type Props = {
   callId: string;

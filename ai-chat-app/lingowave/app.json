@@ -2,11 +2,12 @@
   "expo": {
     "name": "LingoWave",
     "slug": "lingowave",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "lingowave",
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lingowave.app",
@@ -20,6 +21,7 @@
     },
     "android": {
       "package": "com.lingowave.app",
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#CCFBF1",
         "foregroundImage": "./assets/branding/lingowave-logo.png"
@@ -98,7 +100,12 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "newArchEnabled": false,
+            "minSdkVersion": 24
+          },
+          "ios": {
+            "newArchEnabled": false
           }
         }
       ]
