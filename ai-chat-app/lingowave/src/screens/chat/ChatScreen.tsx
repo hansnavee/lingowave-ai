@@ -13,8 +13,6 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-import * as Clipboard from "expo-clipboard";
-
 import {
   CompositeNavigationProp,
   RouteProp,
@@ -799,10 +797,10 @@ export default function ChatScreen() {
         }}
         onCopy={async () => {
           if (selectedMessage) {
-            await Clipboard.setStringAsync(
-              selectedMessage.originalText ?? selectedMessage.content
+            Alert.alert(
+              "Copy unavailable",
+              "Clipboard is temporarily disabled on this build."
             );
-            Alert.alert("Copied", "Message copied to clipboard.");
           }
           setActionVisible(false);
         }}

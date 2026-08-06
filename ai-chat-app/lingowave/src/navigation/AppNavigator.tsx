@@ -44,7 +44,7 @@ export default function AppNavigator() {
           elevation: 0,
         },
         tabBarIcon: ({ color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap =
+          let iconName =
             "chatbubble-outline";
 
           switch (route.name) {

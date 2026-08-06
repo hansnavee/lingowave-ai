@@ -16,6 +16,10 @@ const shims = {
     __dirname,
     "src/navigation/shims/react-navigation-bottom-tabs.ts"
   ),
+  "@expo/vector-icons": path.resolve(
+    __dirname,
+    "src/navigation/shims/vector-icons.ts"
+  ),
 };
 
 const upstreamResolveRequest = config.resolver.resolveRequest;

@@ -1,10 +1,5 @@
 import React from "react";
-
-import {
-  StyleSheet,
-} from "react-native";
-
-import { LinearGradient } from "expo-linear-gradient";
+import { StyleSheet, View } from "react-native";
 
 import { useTheme } from "../../theme";
 
@@ -16,16 +11,11 @@ export default function AppBackground({
   const { theme } = useTheme();
 
   return (
-    <LinearGradient
-      colors={[
-        theme.colors.gradientStart,
-        theme.colors.gradientMid,
-        theme.colors.gradientEnd,
-      ]}
-      style={styles.container}
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.gradientMid }]}
     >
       {children}
-    </LinearGradient>
+    </View>
   );
 }
 
