@@ -1,8 +1,7 @@
 import { registerRootComponent } from "expo";
 
 /**
- * Hermes may lack DOMException; polyfill before any app/LiveKit modules load.
- * LiveKit registerGlobals is deferred to call screens (see livekitInit.ts).
+ * Hermes may lack DOMException; polyfill early for any libraries that expect it.
  */
 const g = globalThis as typeof globalThis & {
   DOMException?: new (message?: string, name?: string) => Error;

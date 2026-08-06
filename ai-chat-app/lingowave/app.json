@@ -2,7 +2,7 @@
   "expo": {
     "name": "LingoWave",
     "slug": "lingowave",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "scheme": "lingowave",
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.lingowave.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#CCFBF1",
         "foregroundImage": "./assets/branding/lingowave-logo.png"
@@ -58,8 +58,6 @@
           "backgroundColor": "#E8F5F2"
         }
       ],
-      "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc",
       [
         "expo-contacts",
         {

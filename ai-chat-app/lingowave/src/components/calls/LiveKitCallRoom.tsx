@@ -17,7 +17,11 @@ type Props = {
   caption?: string;
 };
 
-/** Default / web implementation — media runs on native via LiveKitCallRoom.native.tsx */
+/**
+ * Call media (LiveKit/WebRTC) is intentionally not linked in the current
+ * Android APK — native WebRTC was crashing on open on some devices.
+ * Chat and the rest of the app stay usable; media will be re-enabled once stable.
+ */
 export default function LiveKitCallRoom(props: Props) {
   const { theme } = useTheme();
   const navigation = useNavigation();
@@ -25,11 +29,11 @@ export default function LiveKitCallRoom(props: Props) {
   return (
     <View style={styles.centered}>
       <AppText weight="700" style={styles.message}>
-        Calls need the iOS/Android development build.
+        Voice/video calling is temporarily unavailable
       </AppText>
       <AppText color={theme.colors.textSecondary} style={styles.message}>
-        Open LingoWave on a device build to place {props.callType} calls with{" "}
-        {props.peerName}.
+        Chat still works. Media for {props.callType} calls with {props.peerName}{" "}
+        will return in a later update.
       </AppText>
       <TouchableOpacity
         style={[styles.endBtn, { backgroundColor: theme.colors.callEnd }]}

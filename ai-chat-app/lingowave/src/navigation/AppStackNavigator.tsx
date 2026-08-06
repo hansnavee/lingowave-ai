@@ -3,8 +3,6 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import AppNavigator from "./AppNavigator";
-import CallVideo from "../screens/calls/VideoCall";
-import AudioCall from "../screens/calls/AudioCallScreen";
 import SubscriptionScreen from "../screens/subscription/SubscriptionScreen";
 import LanguageSetupScreen from "../screens/onboarding/LanguageSetupScreen";
 import EditProfileScreen from "../screens/profile/EditProfileScreen";
@@ -27,8 +25,18 @@ export default function AppStackNavigator() {
         }}
       >
         <Stack.Screen name="Main" component={AppNavigator} />
-        <Stack.Screen name="CallVideo" component={CallVideo} />
-        <Stack.Screen name="AudioCall" component={AudioCall} />
+        <Stack.Screen
+          name="CallVideo"
+          getComponent={() =>
+            require("../screens/calls/VideoCall").default
+          }
+        />
+        <Stack.Screen
+          name="AudioCall"
+          getComponent={() =>
+            require("../screens/calls/AudioCallScreen").default
+          }
+        />
         <Stack.Screen name="Subscription" component={SubscriptionScreen} />
         <Stack.Screen
           name="LanguageSettings"
