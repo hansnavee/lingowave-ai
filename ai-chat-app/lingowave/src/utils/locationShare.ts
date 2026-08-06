@@ -1,32 +1,12 @@
-import * as Location from "expo-location";
-
 export type SharedLocation = {
   latitude: number;
   longitude: number;
   label: string;
 };
 
+/** Location sharing stub — expo-location omitted from this Vivo-safe APK. */
 export async function getCurrentShareLocation(): Promise<SharedLocation> {
-  const permission = await Location.requestForegroundPermissionsAsync();
-
-  if (!permission.granted) {
-    throw new Error("Location permission denied");
-  }
-
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
-
-  const { latitude, longitude } = position.coords;
-  const places = await Location.reverseGeocodeAsync({ latitude, longitude });
-  const place = places[0];
-  const label = place
-    ? [place.name, place.city, place.region, place.country]
-        .filter(Boolean)
-        .join(", ")
-    : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-
-  return { latitude, longitude, label };
+  throw new Error("Location sharing is temporarily unavailable on this build.");
 }
 
 export function encodeLocationContent(location: SharedLocation): string {

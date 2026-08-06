@@ -2,18 +2,25 @@
   "expo": {
     "name": "LingoWave",
     "slug": "lingowave",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "scheme": "lingowave",
     "orientation": "portrait",
     "icon": "./assets/branding/lingowave-logo.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lingowave.app"
+      "bundleIdentifier": "com.lingowave.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "LingoWave needs photo library access so you can share images in chats.",
+        "NSContactsUsageDescription": "LingoWave uses your contacts to show friends who already joined the app.",
+        "NSLocationWhenInUseUsageDescription": "LingoWave uses your location when you choose to share it in a chat.",
+        "NSCameraUsageDescription": "LingoWave needs camera access to send photos in chats.",
+        "NSMicrophoneUsageDescription": "LingoWave needs microphone access for voice messages."
+      }
     },
     "android": {
       "package": "com.lingowave.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#CCFBF1",
         "foregroundImage": "./assets/branding/lingowave-logo.png"
@@ -28,6 +35,8 @@
       "favicon": "./assets/branding/lingowave-logo.png"
     },
     "plugins": [
+      "expo-secure-store",
+      "expo-font",
       [
         "expo-splash-screen",
         {
@@ -37,6 +46,7 @@
           "backgroundColor": "#E8F5F2"
         }
       ],
+      "expo-web-browser",
       [
         "expo-build-properties",
         {

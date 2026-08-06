@@ -1,4 +1,4 @@
-/** Diagnostic build — optional native deps removed from package.json. */
+/** Optional native modules are restored selectively after the diagnostic boot. */
 module.exports = {
   dependencies: {},
 };

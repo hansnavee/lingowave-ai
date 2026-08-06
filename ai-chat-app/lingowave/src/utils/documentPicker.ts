@@ -1,15 +1,4 @@
-import * as DocumentPicker from "expo-document-picker";
-
-export async function pickDocument() {
-
-  const result =
-    await DocumentPicker.getDocumentAsync({
-      copyToCacheDirectory: true,
-    });
-
-  if (result.canceled) {
-    return null;
-  }
-
-  return result.assets[0];
+/** Document stub — expo-document-picker omitted from this Vivo-safe APK. */
+export async function pickDocument(): Promise<null> {
+  throw new Error("File picker is temporarily unavailable on this build.");
 }

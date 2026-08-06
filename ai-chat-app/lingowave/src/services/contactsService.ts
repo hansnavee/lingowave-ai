@@ -1,7 +1,4 @@
 import { Platform } from "react-native";
-import * as Contacts from "expo-contacts";
-
-import { normalizePhone } from "../utils/validation";
 
 export type DeviceContact = {
   id: string;
@@ -9,52 +6,16 @@ export type DeviceContact = {
   phones: string[];
 };
 
+/** Contacts stub — expo-contacts omitted from this Vivo-safe APK. */
 export async function requestContactsPermission(): Promise<boolean> {
   if (Platform.OS === "web") {
     return false;
   }
-
-  const current = await Contacts.getPermissionsAsync();
-  if (current.granted) {
-    return true;
-  }
-
-  const next = await Contacts.requestPermissionsAsync();
-  return next.granted;
+  return false;
 }
 
 export async function loadDeviceContacts(): Promise<DeviceContact[]> {
-  const granted = await requestContactsPermission();
-  if (!granted) {
-    return [];
-  }
-
-  const { data } = await Contacts.getContactsAsync({
-    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
-    pageSize: 2000,
-    sort: Contacts.SortTypes.FirstName,
-  });
-
-  return (data ?? [])
-    .map((contact) => {
-      const phones = (contact.phoneNumbers ?? [])
-        .map((entry) => normalizePhone(entry.number ?? ""))
-        .filter((phone) => phone.length >= 10);
-
-      if (phones.length === 0) {
-        return null;
-      }
-
-      return {
-        id: contact.id,
-        name:
-          contact.name?.trim() ||
-          [contact.firstName, contact.lastName].filter(Boolean).join(" ") ||
-          phones[0],
-        phones: [...new Set(phones)],
-      } satisfies DeviceContact;
-    })
-    .filter((contact): contact is DeviceContact => Boolean(contact));
+  return [];
 }
 
 export function collectContactPhones(contacts: DeviceContact[]): string[] {
