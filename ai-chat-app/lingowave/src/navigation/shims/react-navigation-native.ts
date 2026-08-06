@@ -8,4 +8,4 @@ export {
   type NativeStackNavigationProp,
   type CompositeNavigationProp,
   type NavigatorScreenParams,
-} from "./jsNavigation";
+} from "../jsNavigation";
